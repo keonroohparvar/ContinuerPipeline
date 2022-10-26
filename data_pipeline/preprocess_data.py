@@ -11,9 +11,11 @@ import shutil
 import os
 import subprocess
 
-import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.io import wavfile
+import matplotlib.pyplot as plt
+plt.rcParams["figure.figsize"] = [7.00, 3.50]
+plt.rcParams["figure.autolayout"] = True
 
 parser =  argparse.ArgumentParser()
 parser.add_argument('song_dir', type=str, help='This is the path to the directory that contains all the downloaded mp4 songs.')
@@ -36,7 +38,7 @@ def convert_mp4_to_wav(mp4_dir, wav_dir):
         subprocess.call([
             'ffmpeg',
             '-i', this_file_location,
-            '-ac', '2',
+            '-ac', '1',
             '-f', 'wav',
             this_file_out_location
         ])
@@ -47,18 +49,13 @@ def convert_wav_to_spectrogram(wav_dir, out_dir):
 
     for wav_file in all_wav_files:
         wav_file_location = os.path.join(wav_dir, wav_file)
+        print(f'Location: {wav_file_location}')
         sample_rate, samples = wavfile.read(wav_file_location)
-        frequencies, times, spectrogram = signal.spectrogram(samples, sample_rate)
-
-        print(frequencies)
-        print(times)
-        print(spectrogram)
-
-        plt.pcolormesh(times, frequencies, spectrogram)
-        plt.imshow(spectrogram)
-        plt.ylabel('Frequency [Hz]')
-        plt.xlabel('Time [sec]')
-        plt.show()
+        # frequencies, times, spectrogram = signal.spectrogram(samples, sample_rate) 
+        powerSpectrum, frequenciesFound, time, imageAxis = plt.specgram(samples, Fs=sample_rate)
+        
+        out_location = os.path.join(out_dir, wav_file[:-3] + 'png')
+        plt.savefig(out_location)
 
 def zscore_normalize_songs(mp4_dir):
     pass
@@ -69,7 +66,7 @@ def preprocess_data(mp4_dir, normalize_data, out_dir):
     wav_dir = os.path.join(mp4_dir, 'wav_files')
     os.makedirs(wav_dir, exist_ok=True)
 
-    # # Convert all mp4 files to wav files
+    # Convert all mp4 files to wav files
     # convert_mp4_to_wav(mp4_dir, wav_dir)
 
     # Z-Score Normalize the .wav files
@@ -84,3 +81,4 @@ def preprocess_data(mp4_dir, normalize_data, out_dir):
 
 if __name__ == '__main__':
     preprocess_data(args.song_dir, False, args.output_dir)
+    
