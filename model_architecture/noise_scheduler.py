@@ -52,3 +52,4 @@ class BetaScheduler:
         # mean + variance
         return sqrt_alphas_cumprod_t.to(device) * x_0.to(device) \
         + sqrt_one_minus_alphas_cumprod_t.to(device) * noise.to(device), noise.to(device)
+        

@@ -20,7 +20,16 @@ def show_images(dataset, num_samples=20, cols=4):
         plt.subplot(int(num_samples/cols) + 1, cols, i + 1)
         plt.imshow(img[0])
 
-data = torchvision.datasets.StanfordCars(root=".", download=True)
-show_images(data)
+
+def main():
+    data = torchvision.datasets.StanfordCars(root=".", download=True)
+    show_images(data)
+
+
+
+
+
+if __name__ == '__main__':
+    main()
 
 
