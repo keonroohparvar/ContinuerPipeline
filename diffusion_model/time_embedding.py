@@ -4,6 +4,7 @@ This contains the class implementation of the class that we will use for time em
 
 import math
 import torch
+from torch import nn
 
 class SinusoidalPositionEmbeddings(nn.Module):
     def __init__(self, dim):

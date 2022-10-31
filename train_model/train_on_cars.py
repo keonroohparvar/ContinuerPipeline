@@ -5,10 +5,18 @@ analyze our model's results on a toy dataset of car images provided by PyTorch.
 Implementation taken from: https://colab.research.google.com/drive/1sjy9odlSSy0RBVgMTgP7s99NXsqglsUL?usp=sharing#scrollTo=LQnlc27k7Aiw
 
 """
-
+# Global Imports
+import sys
+import os
 import torch
 import torchvision
 import matplotlib.pyplot as plt
+
+# Local imports
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from diffusion_model import loss, noise_scheduler, time_embedding, unet
+
+
 
 def show_images(dataset, num_samples=20, cols=4):
     """ Plots some samples from the dataset """
@@ -30,6 +38,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    print('hi')
 
 
