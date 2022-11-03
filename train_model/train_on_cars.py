@@ -9,10 +9,14 @@ Initial implementation taken from
 # Global Imports
 import sys
 import os
+
 import torch
 import torchvision
-import matplotlib.pyplot as plt
+from torchvision import transforms
 from torch.optim import Adam
+from torch.utils.data import DataLoader
+
+import matplotlib.pyplot as plt
 
 # Local imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -21,6 +25,25 @@ from diffusion_model.noise_scheduler import BetaScheduler
 from diffusion_model.time_embedding import SinusoidalPositionEmbeddings
 from diffusion_model.model_architecture import SimpleUnet
 
+def get_car_data(img_size, batch_size):
+
+    data_transforms = [
+        transforms.Resize((img_size, img_size)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(), # Scales data into [0,1] 
+        transforms.Lambda(lambda t: (t * 2) - 1) # Scale between [-1, 1] 
+    ]
+    data_transform = transforms.Compose(data_transforms)
+
+    train = torchvision.datasets.StanfordCars(root=".", download=True, 
+                                         transform=data_transform)
+
+    test = torchvision.datasets.StanfordCars(root=".", download=True, 
+                                         transform=data_transform, split='test')
+    data = torch.utils.data.ConcatDataset([train, test])
+    dataloader = DataLoader(data, batch_size=batch_size, shuffle=True, drop_last=True)
+
+    return dataloader
 
 
 def show_images(dataset, num_samples=20, cols=4):
@@ -33,6 +56,7 @@ def show_images(dataset, num_samples=20, cols=4):
         plt.imshow(img[0])
 
 
+
 def train_model(data, model, loss_type, epochs, batch_size):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
@@ -41,7 +65,7 @@ def train_model(data, model, loss_type, epochs, batch_size):
     noise = BetaScheduler(T=300)
 
     for epoch in range(epochs):
-        for step, batch in enumerate(dataloader):
+        for step, batch in enumerate(data):
             optimizer.zero_grad()
 
             t = torch.randint(0, noise.T, (batch_size,), device=device).long()
@@ -60,15 +84,20 @@ def train_model(data, model, loss_type, epochs, batch_size):
 
 
 def main():
+    # Set Hyperparameters
+    IMG_SIZE = 64
+    LOSS_TYPE = 'l1'
+    NUM_EPOCHS = 100
+    BATCH_SIZE = 128
+
     # Get Data
-    data = torchvision.datasets.StanfordCars(root=".", download=True)
-    show_images(data)
+    dataloader = get_car_data(IMG_SIZE, BATCH_SIZE)
 
     # Get Model
     model = None
 
     # Train model
-    train_model(data, model)
+    train_model(dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE)
 
 
 
