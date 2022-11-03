@@ -3,6 +3,8 @@ This contains the class implementation of the loss function, and allows the user
 loss function to use.
 """
 
+import torch.nn.functional as F
+
 class LossFunction:
     def __init__(self, loss_type='l1'):
         self.loss_type = loss_type
