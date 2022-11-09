@@ -7,7 +7,7 @@ from torch import nn
 
 class Block(nn.Module):
     def __init__(self, in_channel, out_channel, time_embedding_dim, up=False):
-        super.__init__()
+        super().__init__()
         self.time_mlp =  nn.Linear(time_embedding_dim, out_channel)
         if up:
             self.conv1 = nn.Conv2d(2*in_channel, out_channel, 3, padding=1)

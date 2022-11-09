@@ -12,17 +12,20 @@ import numpy as np
 
 class BetaScheduler:
     def __init__(self, T, type='linear'):
+        # Set Type
         self.type = type
-        self.T = T
 
-    def get_beta_schedule(self, timesteps, start, end):
+        # Get Beta schedule
+        self.T = T
+        self.betas = self.get_beta_schedule(timesteps=T)
+
+    def get_beta_schedule(self, timesteps, start=0.0001, end=0.02):
         """
         Main function that returns the beta schedule.
 
         """
         if self.type == 'linear':
-            self.betas = torch.linspace(start, end, timesteps)
-            return self.betas
+            return torch.linspace(start, end, timesteps)
         
         else:
             raise NotImplementedError()

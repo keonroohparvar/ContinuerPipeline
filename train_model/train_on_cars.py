@@ -18,8 +18,11 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
+# Add parent dir to path
+parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_path)
+
 # Local imports
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from diffusion_model.LossFunction import LossFunction
 from diffusion_model.noise_scheduler import BetaScheduler
 from diffusion_model.time_embedding import SinusoidalPositionEmbeddings
@@ -35,10 +38,10 @@ def get_car_data(img_size, batch_size):
     ]
     data_transform = transforms.Compose(data_transforms)
 
-    train = torchvision.datasets.StanfordCars(root=".", download=True, 
+    train = torchvision.datasets.StanfordCars(root=os.path.dirname(os.path.abspath(__file__)), download=True, 
                                          transform=data_transform)
 
-    test = torchvision.datasets.StanfordCars(root=".", download=True, 
+    test = torchvision.datasets.StanfordCars(root=os.path.dirname(os.path.abspath(__file__)), download=True, 
                                          transform=data_transform, split='test')
     data = torch.utils.data.ConcatDataset([train, test])
     dataloader = DataLoader(data, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -94,7 +97,7 @@ def main():
     dataloader = get_car_data(IMG_SIZE, BATCH_SIZE)
 
     # Get Model
-    model = None
+    model = SimpleUnet()
 
     # Train model
     train_model(dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE)
@@ -104,7 +107,7 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    print('hi')
+    main()
+    # print('hi')
 
 
