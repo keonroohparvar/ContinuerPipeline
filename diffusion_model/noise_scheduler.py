@@ -102,20 +102,20 @@ class BetaScheduler:
             return model_mean + torch.sqrt(posterior_variance_t) * noise 
 
     @torch.no_grad()
-    def sample_plot_image(self, IMG_SIZE, device, T):
+    def sample_plot_image(self, IMG_SIZE, device, model):
         # Sample noise
         img_size = IMG_SIZE
         img = torch.randn((1, 3, img_size, img_size), device=device)
         plt.figure(figsize=(15,15))
         plt.axis('off')
         num_images = 10
-        stepsize = int(T/num_images)
+        stepsize = int(self.T/num_images)
 
-        for i in range(0,T)[::-1]:
+        for i in range(0, self.T)[::-1]:
             t = torch.full((1,), i, device=device, dtype=torch.long)
-            img = self.sample_timestep(img, t)
+            img = self.sample_timestep(img, t, model)
             if i % stepsize == 0:
-                plt.subplot(1, num_images, i/stepsize+1)
+                plt.subplot(1, num_images, int(i/stepsize+1))
                 self.show_tensor_image(img.detach().cpu())
         plt.show()      
         

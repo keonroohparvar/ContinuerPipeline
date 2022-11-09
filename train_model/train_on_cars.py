@@ -65,14 +65,16 @@ def train_model(data, model, loss_type, epochs, batch_size):
     model.to(device)
     optimizer = Adam(model.parameters(), lr=0.001)
     loss_func = LossFunction(loss_type)
-    noise = BetaScheduler(T=300)
+    noise_schedule = BetaScheduler(T=300)
 
     for epoch in range(epochs):
         for step, batch in enumerate(data):
+            if epoch % 5 == 0 and step == 0:
+                print(f'Epoch {epoch}...')
             optimizer.zero_grad()
 
-            t = torch.randint(0, noise.T, (batch_size,), device=device).long()
-            x_noisy, noise = noise.forward_diffusion_sample(batch[0], t, device)
+            t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
+            x_noisy, noise = noise_schedule.forward_diffusion_sample(batch[0], t, device)
             noise_pred = model(x_noisy, t)
 
 
@@ -82,9 +84,7 @@ def train_model(data, model, loss_type, epochs, batch_size):
 
             if epoch % 5 == 0 and step == 0:
                 print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
-                noise.sample_plot_image()
-
-
+                noise_schedule.sample_plot_image(64, device, model)
 
 def main():
     # Set Hyperparameters
@@ -102,12 +102,6 @@ def main():
     # Train model
     train_model(dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE)
 
-
-
-
-
 if __name__ == '__main__':
     main()
     # print('hi')
-
-
