@@ -9,6 +9,7 @@ Initial implementation taken from
 # Global Imports
 import sys
 import os
+from datetime import datetime
 
 import torch
 import torchvision
@@ -58,9 +59,11 @@ def show_images(dataset, num_samples=20, cols=4):
         plt.subplot(int(num_samples/cols) + 1, cols, i + 1)
         plt.imshow(img[0])
 
+def save_img_to_image_dir(save_dir, img):
+    pass
 
 
-def train_model(data, model, loss_type, epochs, batch_size):
+def train_model(train_dir, data, model, loss_type, epochs, batch_size):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     optimizer = Adam(model.parameters(), lr=0.001)
@@ -84,11 +87,20 @@ def train_model(data, model, loss_type, epochs, batch_size):
 
             if epoch % 5 == 0 and step == 0:
                 print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
-                noise_schedule.sample_plot_image(64, device, model)
+                # noise_schedule.sample_plot_image(64, device, model)
+                noise_schedule.save_img_to_image_dir(train_dir, epoch, 64, device, model)
 
 def main():
-    # Set Hyperparameters
+    # Set training parameters
+    TRAINING_FOLDER_LOCATION = os.path.join(*[os.path.dirname(os.path.abspath(__file__)), 'runs', datetime.now().strftime('%m-%d_%H_%M_%S')])
     IMG_SIZE = 64
+
+    print(TRAINING_FOLDER_LOCATION)
+
+    if not os.path.isdir(TRAINING_FOLDER_LOCATION):
+        os.mkdir(TRAINING_FOLDER_LOCATION)
+    
+    # Set Hyperparameters
     LOSS_TYPE = 'l1'
     NUM_EPOCHS = 100
     BATCH_SIZE = 128
@@ -100,7 +112,7 @@ def main():
     model = SimpleUnet()
 
     # Train model
-    train_model(dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE)
+    train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE)
 
 if __name__ == '__main__':
     main()

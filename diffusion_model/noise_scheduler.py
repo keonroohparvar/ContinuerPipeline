@@ -2,12 +2,13 @@
 This function is the implementation of the class that handles the noise scheduler.
 """
 
+import os
+
 import torch
 from torchvision import transforms
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
-
 
 
 class BetaScheduler:
@@ -118,4 +119,34 @@ class BetaScheduler:
                 plt.subplot(1, num_images, int(i/stepsize+1))
                 self.show_tensor_image(img.detach().cpu())
         plt.show()      
+    
+    @torch.no_grad()
+    def save_img_to_image_dir(self, save_dir, epoch_num, IMG_SIZE, device, model):
+        # Sample noise
+        img_size = IMG_SIZE
+        img = torch.randn((1, 3, img_size, img_size), device=device)
+        plt.figure(figsize=(15,15))
+        plt.axis('off')
+        num_images = 5
+        stepsize = int(self.T/num_images)
+
+        for i in range(0, self.T)[::-1]:
+            t = torch.full((1,), i, device=device, dtype=torch.long)
+            img = self.sample_timestep(img, t, model)
+            if i % stepsize == 0:
+                reverse_transforms = transforms.Compose([
+                transforms.Lambda(lambda t: (t + 1) / 2),
+                transforms.Lambda(lambda t: t.permute(1, 2, 0)), # CHW to HWC
+                transforms.Lambda(lambda t: t * 255.),
+                transforms.Lambda(lambda t: t.numpy().astype(np.uint8)),
+                transforms.ToPILImage(),
+                ])
+
+                # Take first image of batch
+                if len(img.shape) == 4:
+                    img_to_save = img[0, :, :, :] 
+                    # plt.subplot(1, num_imgs, int(i/stepsize+1))
+                
+                img_to_save_transformed = reverse_transforms(img_to_save)
+                img_to_save_transformed.save(os.path.join(save_dir, f'epoch{epoch_num}_step{i}.jpg'))
         
