@@ -122,6 +122,11 @@ class BetaScheduler:
     
     @torch.no_grad()
     def save_img_to_image_dir(self, save_dir, epoch_num, IMG_SIZE, device, model):
+        # Create epoch folder
+        epoch_folder_name = os.path.join(save_dir, str(epoch_num))
+        if not os.path.isdir(epoch_folder_name):
+            os.mkdir(epoch_folder_name)
+
         # Sample noise
         img_size = IMG_SIZE
         img = torch.randn((1, 3, img_size, img_size), device=device)
@@ -138,6 +143,7 @@ class BetaScheduler:
                 transforms.Lambda(lambda t: (t + 1) / 2),
                 transforms.Lambda(lambda t: t.permute(1, 2, 0)), # CHW to HWC
                 transforms.Lambda(lambda t: t * 255.),
+                transforms.Lambda(lambda t: t.cpu()),
                 transforms.Lambda(lambda t: t.numpy().astype(np.uint8)),
                 transforms.ToPILImage(),
                 ])
@@ -148,5 +154,5 @@ class BetaScheduler:
                     # plt.subplot(1, num_imgs, int(i/stepsize+1))
                 
                 img_to_save_transformed = reverse_transforms(img_to_save)
-                img_to_save_transformed.save(os.path.join(save_dir, f'epoch{epoch_num}_step{i}.jpg'))
+                img_to_save_transformed.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
         

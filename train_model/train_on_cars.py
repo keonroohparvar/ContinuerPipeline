@@ -71,9 +71,9 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
     noise_schedule = BetaScheduler(T=300)
 
     for epoch in range(epochs):
+        print(f'Epoch {epoch}...')
         for step, batch in enumerate(data):
-            if epoch % 5 == 0 and step == 0:
-                print(f'Epoch {epoch}...')
+            print(f'Step: {step}')
             optimizer.zero_grad()
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
@@ -88,12 +88,12 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
             if epoch % 5 == 0 and step == 0:
                 print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
                 # noise_schedule.sample_plot_image(64, device, model)
-                noise_schedule.save_img_to_image_dir(train_dir, epoch, 64, device, model)
+                noise_schedule.save_img_to_image_dir(train_dir, epoch, 128, device, model)
 
 def main():
     # Set training parameters
     TRAINING_FOLDER_LOCATION = os.path.join(*[os.path.dirname(os.path.abspath(__file__)), 'runs', datetime.now().strftime('%m-%d_%H_%M_%S')])
-    IMG_SIZE = 64
+    IMG_SIZE = 128
 
     print(TRAINING_FOLDER_LOCATION)
 
