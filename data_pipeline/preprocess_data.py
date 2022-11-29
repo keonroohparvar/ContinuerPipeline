@@ -53,9 +53,20 @@ def convert_wav_to_spectrogram(wav_dir, out_dir):
         sample_rate, samples = wavfile.read(wav_file_location)
         # frequencies, times, spectrogram = signal.spectrogram(samples, sample_rate) 
         powerSpectrum, frequenciesFound, time, imageAxis = plt.specgram(samples, Fs=sample_rate)
+
+        plt.axis('off')
+
+        # # Remove borders
+        plt.axis('off')
+        # fig.axes.get_xaxis().set_visible(False)
+        # fig.axes.get_yaxis().set_visible(False) 
+
         
         out_location = os.path.join(out_dir, wav_file[:-3] + 'png')
-        plt.savefig(out_location)
+        # plt.savefig(out_location, dpi=300, frameon='false')
+        plt.savefig(out_location, dpi=300, bbox_inches='tight', pad_inches=0.0, transparent=True)
+        # plt.savefig(out_location, dpi=300, bbox_inches='tight', pad_inches=0, transparent=True)
+        # plt.imsave(out_location, )
 
 def zscore_normalize_songs(mp4_dir):
     pass

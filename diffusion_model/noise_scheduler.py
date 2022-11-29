@@ -45,6 +45,7 @@ class BetaScheduler:
         Takes an image and a timestep as input and 
         returns the noisy version of it
         """
+        print(x_0.shape)
         # Terms calculated in closed form
         self.alphas = 1. - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, axis=0)
