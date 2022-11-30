@@ -45,6 +45,7 @@ class BetaScheduler:
         Takes an image and a timestep as input and 
         returns the noisy version of it
         """
+        print('x shape')
         print(x_0.shape)
         # Terms calculated in closed form
         self.alphas = 1. - self.betas
