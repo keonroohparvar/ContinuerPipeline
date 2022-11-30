@@ -57,7 +57,7 @@ def convert_wav_to_spectrogram(wav_dir, out_dir):
         # frequencies, times, spectrogram = signal.spectrogram(samples, sample_rate) 
         powerSpectrum, frequenciesFound, time, imageAxis = plt.specgram(samples, Fs=sample_rate)
 
-        samples_dict[wav_file] = samples
+        samples_dict[wav_file] = sample_rate
 
         plt.axis('off')
 
@@ -75,7 +75,9 @@ def convert_wav_to_spectrogram(wav_dir, out_dir):
 
     # Save samples dict out
     out_filepath = os.path.join(out_dir, 'samples_dict.json')
-    json.dumps(samples_dict, out_filepath)
+    with open(out_filepath, 'w') as f:
+        json.dump(samples_dict, f)
+
 
 def save_samples_dict(wav_dir, out_dir):
     all_wav_files = [i for i in os.listdir(wav_dir) if i[-3:] == 'wav']
@@ -87,11 +89,12 @@ def save_samples_dict(wav_dir, out_dir):
         print(f'Location: {wav_file_location}')
         sample_rate, samples = wavfile.read(wav_file_location)
 
-        samples_dict[wav_file] = samples
+        samples_dict[wav_file] = sample_rate
 
     # Save dict out
     out_filepath = os.path.join(out_dir, 'samples_dict.json')
-    json.dumps(samples_dict, out_filepath)
+    with open(out_filepath, 'w') as f:
+        json.dump(samples_dict, f)
 
 
 
@@ -124,5 +127,5 @@ def preprocess_data(mp4_dir, normalize_data, out_dir):
 
 if __name__ == '__main__':
     # preprocess_data(args.song_dir, False, args.output_dir)
-    save_samples_dict(f'{args.songs_dir}/wav_files', args.output_dir)
+    save_samples_dict(f'{args.song_dir}/wav_files', args.output_dir)
     
