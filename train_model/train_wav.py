@@ -1,7 +1,10 @@
 """
-This script will have our model train on the Jazz dataset.
+This script will have our model train on .wav files.
 
+Author: Keon Roohparvar
+Date: November 30, 2022
 """
+
 # Python Imports
 import sys
 import os
@@ -12,36 +15,34 @@ import torchaudio
 from torchaudio import transforms
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from torchvision.datasets import ImageFolder
 
 # Add parent dir to path
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_path)
 
 # Local imports
+from data_pipeline.AudioDataset import AudioDataset
 from diffusion_model.LossFunction import LossFunction
 from diffusion_model.noise_scheduler import BetaScheduler
 from diffusion_model.time_embedding import SinusoidalPositionEmbeddings
 from diffusion_model.model_architecture import SimpleUnet
 
-def get_data(image_dir, img_size, batch_size):
-    data_transforms = [
-        transforms.Resize((img_size, img_size)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(), # Scales data into [0,1] 
-        transforms.Lambda(lambda t: (t * 2) - 1) # Scale between [-1, 1] 
-    ]
-    data_transform = transforms.Compose(data_transforms)
+def get_data(image_dir, batch_size):
+    # data_transforms = [
+    #     transforms.Resize((img_size, img_size)),
+    #     transforms.RandomHorizontalFlip(),
+    #     transforms.ToTensor(), # Scales data into [0,1] 
+    #     transforms.Lambda(lambda t: (t * 2) - 1) # Scale between [-1, 1] 
+    # ]
+    # data_transform = transforms.Compose(data_transforms)
 
-    data = ImageFolder(
-            root=image_dir,
-            transform=data_transform
+    data = AudioDataset(
+            root_dir=image_dir,
+            song_offset=10,
+            song_duration=10,
+            transform=None # SEE IF WE NEED TO CHANGE THIS
         )
 
-    # data = torchvision.ImageFolder(
-    #         root=image_dir,
-    #         transform=torchvision.transforms.ToTensor()
-        
     dataloader = DataLoader(data, batch_size=batch_size, shuffle=True, drop_last=True)
 
     return dataloader
@@ -50,6 +51,7 @@ def save_model(model, model_dir, epoch_num):
     this_model_path = os.path.join(model_dir, f'model_{str(epoch_num)}')
     torch.save(model.state_dict(), this_model_path)
     print(f'Saved model -> {this_model_path}')
+
 
 def train_model(train_dir, data, model, loss_type, epochs, batch_size):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -79,12 +81,10 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
                 # noise_schedule.sample_plot_image(64, device, model)
                 noise_schedule.save_img_to_image_dir(train_dir, epoch, 64, device, model)
 
-    
 def main():
     # Set training parameters
-    DATA_DIR = '/Users/keonroohparvar/Documents/School/2022-2023/Fall/CSC596/JazzBot/spectrograms'
+    DATA_DIR = '/Users/keonroohparvar/Documents/School/2022-2023/Fall/CSC596/JazzBot/data_raw/wav_files'
     TRAINING_FOLDER_LOCATION = os.path.join(*[os.path.dirname(os.path.abspath(__file__)), 'runs', datetime.now().strftime('%m-%d_%H_%M_%S')])
-    IMG_SIZE = 64
 
     print(TRAINING_FOLDER_LOCATION)
 
@@ -94,10 +94,10 @@ def main():
     # Set Hyperparameters
     LOSS_TYPE = 'l1'
     NUM_EPOCHS = 100
-    BATCH_SIZE = 16
+    BATCH_SIZE = 4
 
     # Get Data
-    dataloader = get_data(DATA_DIR, IMG_SIZE, BATCH_SIZE)
+    dataloader = get_data(DATA_DIR, BATCH_SIZE)
 
     # Get Model
     model = SimpleUnet()
@@ -106,5 +106,6 @@ def main():
     train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE)
 
 
-if __name__ == '__main__':
+
+if __name__ == '__main__': 
     main()
