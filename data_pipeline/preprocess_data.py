@@ -10,6 +10,7 @@ import argparse
 import shutil
 import os
 import subprocess
+import json
 
 from scipy import signal
 from scipy.io import wavfile
@@ -47,12 +48,16 @@ def convert_wav_to_spectrogram(wav_dir, out_dir):
     # Get all files in wav_dir
     all_wav_files = [i for i in os.listdir(wav_dir) if i[-3:] == 'wav']
 
+    samples_dict = {}
+
     for wav_file in all_wav_files:
         wav_file_location = os.path.join(wav_dir, wav_file)
         print(f'Location: {wav_file_location}')
         sample_rate, samples = wavfile.read(wav_file_location)
         # frequencies, times, spectrogram = signal.spectrogram(samples, sample_rate) 
         powerSpectrum, frequenciesFound, time, imageAxis = plt.specgram(samples, Fs=sample_rate)
+
+        samples_dict[wav_file] = samples
 
         plt.axis('off')
 
@@ -68,8 +73,39 @@ def convert_wav_to_spectrogram(wav_dir, out_dir):
         # plt.savefig(out_location, dpi=300, bbox_inches='tight', pad_inches=0, transparent=True)
         # plt.imsave(out_location, )
 
-def zscore_normalize_songs(mp4_dir):
-    pass
+    # Save samples dict out
+    out_filepath = os.path.join(out_dir, 'samples_dict.json')
+    json.dumps(samples_dict, out_filepath)
+
+def save_samples_dict(wav_dir, out_dir):
+    all_wav_files = [i for i in os.listdir(wav_dir) if i[-3:] == 'wav']
+
+    samples_dict = {}
+
+    for wav_file in all_wav_files:
+        wav_file_location = os.path.join(wav_dir, wav_file)
+        print(f'Location: {wav_file_location}')
+        sample_rate, samples = wavfile.read(wav_file_location)
+
+        samples_dict[wav_file] = samples
+
+    # Save dict out
+    out_filepath = os.path.join(out_dir, 'samples_dict.json')
+    json.dumps(samples_dict, out_filepath)
+
+
+
+
+
+def convert_spectrogram_to_wav(spec_dir, out_dir):
+    # Get all files in spec_dir
+    all_spec_files = [i for i in os.listdir(spec_dir) if i[-3:] == 'spec']
+
+    for spec_file in all_spec_files:
+        pass
+
+
+
 
 def preprocess_data(mp4_dir, normalize_data, out_dir):
     # Make temp dir for wav files
@@ -79,10 +115,6 @@ def preprocess_data(mp4_dir, normalize_data, out_dir):
 
     # Convert all mp4 files to wav files
     # convert_mp4_to_wav(mp4_dir, wav_dir)
-
-    # Z-Score Normalize the .wav files
-    if normalize_data:
-        zscore_normalize_songs(wav_dir)
     
     # Convert the wav forms to spectrograms
     if not os.path.isdir(out_dir):
@@ -91,5 +123,6 @@ def preprocess_data(mp4_dir, normalize_data, out_dir):
 
 
 if __name__ == '__main__':
-    preprocess_data(args.song_dir, False, args.output_dir)
+    # preprocess_data(args.song_dir, False, args.output_dir)
+    save_samples_dict(f'{args.songs_dir}/wav_files', args.output_dir)
     
