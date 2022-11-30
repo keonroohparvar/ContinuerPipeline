@@ -67,9 +67,23 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
             
             optimizer.zero_grad()
 
+            # print(batch[0])
+            # print(batch[0].shape)
+            # print('-----')
+            # print(batch[0][0])
+            # print(batch[0][0].shape)
+
+
+
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
-            x_noisy, noise = noise_schedule.forward_diffusion_sample(batch[0], t, device)
+            x_noisy, noise = noise_schedule.forward_diffusion_sample(batch, t, device)
             noise_pred = model(x_noisy, t)
+
+            print(noise_pred)
+            print(noise_pred.shape)
+            print("------")
+            print(noise)
+            print(noise.shape)
 
 
             loss = loss_func.get_loss(noise, noise_pred)
