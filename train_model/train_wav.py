@@ -54,6 +54,10 @@ def save_model(model, model_dir, epoch_num):
 
 
 def train_model(train_dir, data, model, loss_type, epochs, batch_size):
+    # CONSTANTS WE NEED
+    WAV_SIZE = 441000
+    SAMPLE_RATE = 44100
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     optimizer = Adam(model.parameters(), lr=0.001)
@@ -93,7 +97,8 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
             if epoch % 5 == 0 and step == 0:
                 print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
                 # noise_schedule.sample_plot_image(64, device, model)
-                noise_schedule.save_img_to_image_dir(train_dir, epoch, 64, device, model)
+                
+                noise_schedule.save_wav_to_wavs_dir(model, train_dir, epoch, WAV_SIZE, SAMPLE_RATE, device)
 
 def main():
     # Set training parameters
