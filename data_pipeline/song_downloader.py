@@ -27,7 +27,7 @@ def download_songs(link_to_playlist, output_dir, num_songs):
 
     videos = p.videos
 
-    if args.num_songs:
+    if num_songs:
         chosen_videos = np.random.choice(videos, num_songs, replace=False)
     
     else:
@@ -56,5 +56,8 @@ def format_output_dir(output_dir):
     print('Done with formatting output directory.')
 
 if __name__ == '__main__':
-    download_songs(args.link_to_playlist, args.output_dir, args.num_songs)
-    format_output_dir(args.output_dir)
+    link = 'https://www.youtube.com/playlist?list=PLiy0XOfUv4hFHmPs0a8RqkDzfT-2nw7WV'
+    out_dir = '/home/keonroohparvar/2022-2023/fall/csc596/JazzBot/data_raw'
+    num_songs = 10
+    download_songs(link, out_dir, num_songs)
+    format_output_dir(out_dir)
