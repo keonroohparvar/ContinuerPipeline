@@ -6,6 +6,7 @@ import os
 
 import torch
 from torchvision import transforms
+import torchaudio
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,6 +46,7 @@ class BetaScheduler:
         Takes an image and a timestep as input and 
         returns the noisy version of it
         """
+        print('x shape')
         print(x_0.shape)
         # Terms calculated in closed form
         self.alphas = 1. - self.betas
@@ -122,38 +124,38 @@ class BetaScheduler:
         plt.show()      
     
     @torch.no_grad()
-    def save_img_to_image_dir(self, save_dir, epoch_num, IMG_SIZE, device, model):
+    def save_wav_to_wavs_dir(self, model, save_dir, epoch_num, WAV_SIZE, sample_rate, device):
         # Create epoch folder
         epoch_folder_name = os.path.join(save_dir, str(epoch_num))
         if not os.path.isdir(epoch_folder_name):
             os.mkdir(epoch_folder_name)
 
         # Sample noise
-        img_size = IMG_SIZE
-        img = torch.randn((1, 3, img_size, img_size), device=device)
-        plt.figure(figsize=(15,15))
-        plt.axis('off')
-        num_images = 5
-        stepsize = int(self.T/num_images)
+        wav = torch.randn((1, 1, WAV_SIZE), device=device)
+        NUM_WAVS = 5
+        stepsize = int(self.T / NUM_WAVS)
 
         for i in range(0, self.T)[::-1]:
             t = torch.full((1,), i, device=device, dtype=torch.long)
-            img = self.sample_timestep(img, t, model)
+            wav = self.sample_timestep(wav, t, model)
             if i % stepsize == 0:
-                reverse_transforms = transforms.Compose([
-                transforms.Lambda(lambda t: (t + 1) / 2),
-                transforms.Lambda(lambda t: t.permute(1, 2, 0)), # CHW to HWC
-                transforms.Lambda(lambda t: t * 255.),
-                transforms.Lambda(lambda t: t.cpu()),
-                transforms.Lambda(lambda t: t.numpy().astype(np.uint8)),
-                transforms.ToPILImage(),
-                ])
+                # reverse_trCnsforms = transforms.Compose([
+                # transforms.Lambda(lambda t: (t + 1) / 2),
+                # transforms.Lambda(lambda t: t.permute(1, 2, 0)), # CHW to HWC
+                # transforms.Lambda(lambda t: t * 255.),
+                # transforms.Lambda(lambda t: t.cpu()),
+                # transforms.Lambda(lambda t: t.numpy().astype(np.uint8)),
+                # transforms.ToPILImage(),
+                # ])
 
-                # Take first image of batch
-                if len(img.shape) == 4:
-                    img_to_save = img[0, :, :, :] 
+                # Take first wav of batch
+                if len(wav.shape) == 3:
+                    wav_to_save = wav[0, :, :] 
                     # plt.subplot(1, num_imgs, int(i/stepsize+1))
                 
-                img_to_save_transformed = reverse_transforms(img_to_save)
-                img_to_save_transformed.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
+                # img_to_save_transformed = reverse_transforms(img_to_save)
+                # img_to_save_transformed.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
         
+                # Save the wavform
+                print('Saving wavform...')
+                torchaudio.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.wav'), wav_to_save, sample_rate)
