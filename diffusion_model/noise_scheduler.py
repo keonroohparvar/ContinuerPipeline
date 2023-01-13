@@ -5,7 +5,6 @@ This function is the implementation of the class that handles the noise schedule
 import os
 
 import torch
-from torchvision import transforms
 import torchaudio
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
@@ -66,14 +65,14 @@ class BetaScheduler:
         return self.sqrt_alphas_cumprod_t.to(device) * x_0.to(device) \
         + sqrt_one_minus_alphas_cumprod_t.to(device) * noise.to(device), noise.to(device)
     
-    def show_tensor_image(self, image):
-        reverse_transforms = transforms.Compose([
-            transforms.Lambda(lambda t: (t + 1) / 2),
-            transforms.Lambda(lambda t: t.permute(1, 2, 0)), # CHW to HWC
-            transforms.Lambda(lambda t: t * 255.),
-            transforms.Lambda(lambda t: t.numpy().astype(np.uint8)),
-            transforms.ToPILImage(),
-        ])
+    # def show_tensor_image(self, image):
+    #     reverse_transforms = transforms.Compose([
+    #         transforms.Lambda(lambda t: (t + 1) / 2),
+    #         transforms.Lambda(lambda t: t.permute(1, 2, 0)), # CHW to HWC
+    #         transforms.Lambda(lambda t: t * 255.),
+    #         transforms.Lambda(lambda t: t.numpy().astype(np.uint8)),
+    #         transforms.ToPILImage(),
+    #     ])
 
         # Take first image of batch
         if len(image.shape) == 4:

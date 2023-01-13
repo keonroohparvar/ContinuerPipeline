@@ -3,7 +3,6 @@ This file will be the script that loads in data from a folder into pytorch tenso
 """
 
 from torch.utils.data import Dataset
-from torchvision import transforms
 import torchaudio
 import os
 

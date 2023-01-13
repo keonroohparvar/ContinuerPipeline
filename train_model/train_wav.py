@@ -12,7 +12,6 @@ from datetime import datetime
 
 import torch
 import torchaudio
-from torchaudio import transforms
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
@@ -102,7 +101,7 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
 
 def main():
     # Set training parameters
-    DATA_DIR = '/Users/keonroohparvar/Documents/School/2022-2023/Fall/CSC596/JazzBot/data_raw/wav_files'
+    DATA_DIR = '../data'
     TRAINING_FOLDER_LOCATION = os.path.join(*[os.path.dirname(os.path.abspath(__file__)), 'runs', datetime.now().strftime('%m-%d_%H_%M_%S')])
 
     print(TRAINING_FOLDER_LOCATION)

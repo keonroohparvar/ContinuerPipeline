@@ -58,6 +58,6 @@ def format_output_dir(output_dir):
 if __name__ == '__main__':
     link = 'https://www.youtube.com/playlist?list=PLiy0XOfUv4hFHmPs0a8RqkDzfT-2nw7WV'
     out_dir = '/home/keonroohparvar/2022-2023/fall/csc596/JazzBot/data_raw'
-    num_songs = 10
+    num_songs = 40
     download_songs(link, out_dir, num_songs)
     format_output_dir(out_dir)
