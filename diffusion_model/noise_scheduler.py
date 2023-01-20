@@ -12,13 +12,13 @@ import numpy as np
 
 
 class BetaScheduler:
-    def __init__(self, T, type='linear'):
+    def __init__(self, T, type='linear', device='cuda'):
         # Set Type
         self.type = type
 
         # Get Beta schedule
         self.T = T
-        self.betas = self.get_beta_schedule(timesteps=T)
+        self.betas = self.get_beta_schedule(timesteps=T).to(device)
 
     def get_beta_schedule(self, timesteps, start=0.0001, end=0.02):
         """
@@ -37,18 +37,19 @@ class BetaScheduler:
         dimension.
         """
         batch_size = t.shape[0]
-        out = vals.gather(-1, t.cpu())
+        # out = vals.gather(-1, t.cpu())
+        out = vals.gather(-1, t.cuda())
         return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
     
-    def forward_diffusion_sample(self, x_0, t, device="cpu"):
+    def forward_diffusion_sample(self, x_0, t, device):
         """ 
         Takes an image and a timestep as input and 
         returns the noisy version of it
         """
-        print('x shape')
-        print(x_0.shape)
+        # print('x shape')
+        # print(x_0.shape)
         # Terms calculated in closed form
-        self.alphas = 1. - self.betas
+        self.alphas = (1. - self.betas).to(device)
         self.alphas_cumprod = torch.cumprod(self.alphas, axis=0)
         self.alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0)
         self.sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
@@ -98,11 +99,11 @@ class BetaScheduler:
         )
         posterior_variance_t = self.get_index_from_list(self.posterior_variance, t, x.shape)
         
-        if t == 0:
-            return model_mean
-        else:
+        if torch.is_nonzero(t):
             noise = torch.randn_like(x)
             return model_mean + torch.sqrt(posterior_variance_t) * noise 
+        else:
+            return model_mean
 
     @torch.no_grad()
     def sample_plot_image(self, IMG_SIZE, device, model):
@@ -137,16 +138,7 @@ class BetaScheduler:
         for i in range(0, self.T)[::-1]:
             t = torch.full((1,), i, device=device, dtype=torch.long)
             wav = self.sample_timestep(wav, t, model)
-            if i % stepsize == 0:
-                # reverse_trCnsforms = transforms.Compose([
-                # transforms.Lambda(lambda t: (t + 1) / 2),
-                # transforms.Lambda(lambda t: t.permute(1, 2, 0)), # CHW to HWC
-                # transforms.Lambda(lambda t: t * 255.),
-                # transforms.Lambda(lambda t: t.cpu()),
-                # transforms.Lambda(lambda t: t.numpy().astype(np.uint8)),
-                # transforms.ToPILImage(),
-                # ])
-
+            if i==0:
                 # Take first wav of batch
                 if len(wav.shape) == 3:
                     wav_to_save = wav[0, :, :] 
@@ -156,5 +148,5 @@ class BetaScheduler:
                 # img_to_save_transformed.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
         
                 # Save the wavform
-                print('Saving wavform...')
-                torchaudio.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.wav'), wav_to_save, sample_rate)
+                # print('Saving wavform...')
+                torchaudio.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.wav'), wav_to_save.to('cpu'), sample_rate)

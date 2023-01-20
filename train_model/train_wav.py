@@ -15,11 +15,19 @@ import torchaudio
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
+# Print cuda availability
+if torch.cuda.is_available():
+    print(f'Cuda is available!')
+    torch.cuda.set_device(0)
+else:
+    print(f'Cuda is not available :(')
+
 # Add parent dir to path
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_path)
 
 # Local imports
+from data_pipeline.DummyAudioDataset import DummyAudioDataset
 from data_pipeline.AudioDataset import AudioDataset
 from diffusion_model.LossFunction import LossFunction
 from diffusion_model.noise_scheduler import BetaScheduler
@@ -27,14 +35,6 @@ from diffusion_model.time_embedding import SinusoidalPositionEmbeddings
 from diffusion_model.model_architecture import SimpleUnet
 
 def get_data(image_dir, batch_size):
-    # data_transforms = [
-    #     transforms.Resize((img_size, img_size)),
-    #     transforms.RandomHorizontalFlip(),
-    #     transforms.ToTensor(), # Scales data into [0,1] 
-    #     transforms.Lambda(lambda t: (t * 2) - 1) # Scale between [-1, 1] 
-    # ]
-    # data_transform = transforms.Compose(data_transforms)
-
     data = AudioDataset(
             root_dir=image_dir,
             song_offset=10,
@@ -64,44 +64,30 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
     noise_schedule = BetaScheduler(T=300)
 
     for epoch in range(epochs):
+        if epoch % 5 == 0:
+            print(f'Epoch {epoch}...')
         for step, batch in enumerate(data):
-            if epoch % 5 == 0 and step == 0:
-                print(f'Epoch {epoch}...')
-            
+            print('batch shape')
+            print(batch.shape)
             optimizer.zero_grad()
-
-            # print(batch[0])
-            # print(batch[0].shape)
-            # print('-----')
-            # print(batch[0][0])
-            # print(batch[0][0].shape)
-
-
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
             x_noisy, noise = noise_schedule.forward_diffusion_sample(batch, t, device)
             noise_pred = model(x_noisy, t)
 
-            print(noise_pred)
-            print(noise_pred.shape)
-            print("------")
-            print(noise)
-            print(noise.shape)
-
-
             loss = loss_func.get_loss(noise, noise_pred)
             loss.backward()
             optimizer.step()
 
-            if epoch % 5 == 0 and step == 0:
-                print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
-                # noise_schedule.sample_plot_image(64, device, model)
-                
+            print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
+
+            if epoch % 20 == 0 and step == 0 and epoch != 0:
+                print('Saving wav...')
                 noise_schedule.save_wav_to_wavs_dir(model, train_dir, epoch, WAV_SIZE, SAMPLE_RATE, device)
 
 def main():
     # Set training parameters
-    DATA_DIR = '../data'
+    DATA_DIR = '../data' if os.path.isdir('../data') else 'data'
     TRAINING_FOLDER_LOCATION = os.path.join(*[os.path.dirname(os.path.abspath(__file__)), 'runs', datetime.now().strftime('%m-%d_%H_%M_%S')])
 
     print(TRAINING_FOLDER_LOCATION)
@@ -112,10 +98,19 @@ def main():
     # Set Hyperparameters
     LOSS_TYPE = 'l1'
     NUM_EPOCHS = 100
-    BATCH_SIZE = 4
+    BATCH_SIZE = 1
 
-    # Get Data
-    dataloader = get_data(DATA_DIR, BATCH_SIZE)
+    # # Get Data
+    # dataloader = get_data(DATA_DIR, BATCH_SIZE)
+
+    # THE BELOW IS FOR THE DUMMY DATA
+    dummy_data = DummyAudioDataset(
+            root_dir=DATA_DIR,
+            song_offset=10,
+            song_duration=10,
+            transform=None
+        )
+    dataloader = DataLoader(dummy_data, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
 
     # Get Model
     model = SimpleUnet()
