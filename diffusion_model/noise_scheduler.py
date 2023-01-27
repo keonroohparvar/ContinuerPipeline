@@ -132,8 +132,8 @@ class BetaScheduler:
 
         # Sample noise
         wav = torch.randn((1, 1, WAV_SIZE), device=device)
-        NUM_WAVS = 5
-        stepsize = int(self.T / NUM_WAVS)
+        NUM_WAVS_TO_SAVE = 5
+        stepsize = int(self.T / NUM_WAVS_TO_SAVE)
 
         for i in range(0, self.T)[::-1]:
             t = torch.full((1,), i, device=device, dtype=torch.long)

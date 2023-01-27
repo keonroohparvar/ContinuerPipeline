@@ -44,13 +44,13 @@ class DummyAudioDataset(Dataset):
         metadata = torchaudio.info(song)
         sample_rate = metadata.sample_rate
         song_duration_pow_2 = self._format_len_of_song(sample_rate)
-        print(f'song dur pow 2: {song_duration_pow_2}')
+        # print(f'song dur pow 2: {song_duration_pow_2}')
         waveform, _ = torchaudio.load(song, 
                                     frame_offset=sample_rate*self.song_offset, 
                                     num_frames=song_duration_pow_2)
         
         dummy_data = torch.zeros_like(waveform)
 
-        print(f'dummy data shape: {dummy_data.shape}')
+        # print(f'dummy data shape: {dummy_data.shape}')
         
         return dummy_data

@@ -8,16 +8,31 @@ import os
 
 
 class AudioDataset(Dataset):
-    def __init__(self, root_dir, song_offset, song_duration, transform=None):
+    def __init__(self, root_dir, song_offset, song_duration, sample_rate=44100, transform=None):
         self.root_dir = root_dir
         self.song_duration = song_duration
         self.song_offset = song_offset
 
+        self.num_frames_of_waveform = self._format_len_of_song(sample_rate)
+        
         # Save all song paths in dir
         self.song_paths = [os.path.join(root_dir, i) for i in os.listdir(root_dir) if i[-3:] == 'wav']
         self.sample_rates = {}
 
         self.transform = transform
+         
+    def _format_len_of_song(self, sample_rate):
+        """
+        This function is used to make sure the length of the song is a power of 2
+        """
+        NUMBER_OF_CONVOLUTIONS = 6
+        num_frames = sample_rate * self.song_duration
+        num_frames_div_by = 2**NUMBER_OF_CONVOLUTIONS
+        num_frames_of_waveform = num_frames - (num_frames % num_frames_div_by)
+
+        print(f'Waveform size: {num_frames_of_waveform}')
+        
+        return num_frames_of_waveform
        
 
     def __len__(self):
@@ -30,9 +45,10 @@ class AudioDataset(Dataset):
         # Get Metadata to find out how much to load
         metadata = torchaudio.info(song)
         sample_rate = metadata.sample_rate
+
         waveform, _ = torchaudio.load(song, 
                                     frame_offset=sample_rate*self.song_offset, 
-                                    num_frames=sample_rate*self.song_duration)
+                                    num_frames=self.num_frames_of_waveform)
                                     
         self.sample_rates[song] = sample_rate
 
