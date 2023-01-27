@@ -67,8 +67,6 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size):
         if epoch % 5 == 0:
             print(f'Epoch {epoch}...')
         for step, batch in enumerate(data):
-            print('batch shape')
-            print(batch.shape)
             optimizer.zero_grad()
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()

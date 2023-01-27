@@ -11,14 +11,14 @@ class Block(nn.Module):
         self.time_mlp =  nn.Linear(time_embedding_dim, out_channel)
 
         if up:
-            self.conv1 = nn.Conv1d(2*in_channel, out_channel, 3, padding='same')
-            self.transform = nn.ConvTranspose1d(out_channel, out_channel, 3, 2)
+            self.conv1 = nn.Conv1d(2*in_channel, out_channel, 3, padding=1)
+            self.transform = nn.ConvTranspose1d(out_channel, out_channel, 4, 2, padding=1)
 
         else:
-            self.conv1 = nn.Conv1d(in_channel, out_channel, 3, padding='same')
-            self.transform = nn.Conv1d(out_channel, out_channel, 5, 2)
+            self.conv1 = nn.Conv1d(in_channel, out_channel, 3, padding=1)
+            self.transform = nn.Conv1d(out_channel, out_channel, 4, 2, padding=1)
 
-        self.conv2 = nn.Conv1d(out_channel, out_channel, 3, padding='same')
+        self.conv2 = nn.Conv1d(out_channel, out_channel, 3, padding=1)
         self.bnorm1 = nn.BatchNorm1d(out_channel)
         self.bnorm2 = nn.BatchNorm1d(out_channel)
         self.relu  = nn.ReLU()

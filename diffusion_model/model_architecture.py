@@ -30,7 +30,7 @@ class SimpleUnet(nn.Module):
             )
         
         # Initial projection
-        self.conv0 = nn.Conv1d(1, down_channels[0], 3, padding="same")
+        self.conv0 = nn.Conv1d(1, down_channels[0], 3, padding=1)
 
         # Downsample
         self.downs = nn.ModuleList([Block(down_channels[i], down_channels[i+1], \
@@ -47,30 +47,30 @@ class SimpleUnet(nn.Module):
         # Embedd time
         t = self.time_mlp(timestep)
         # Initial conv
-        print(f'x shpae before: {x.shape}')
+        # print(f'x shpae before: {x.shape}')
         x = self.conv0(x)
-        print(f'x shpae after: {x.shape}')
+        # print(f'x shpae after: {x.shape}')
         # Unet
         residual_inputs = []
 
         # Prints for debugging
-        print('before down')
-        print(torch.cuda.memory_allocated())
+        # print('before down')
+        # print(torch.cuda.memory_allocated())
 
         for down in self.downs:
             torch.cuda.memory_allocated()
             x = down(x, t)
-            print(x.shape)
+            # print(x.shape)
             residual_inputs.append(x)
             
         # Prints for debugging
-        print('after down')
-        print(torch.cuda.memory_allocated())
+        # print('after down')
+        # print(torch.cuda.memory_allocated())
 
         for up in self.ups:
             residual_x = residual_inputs.pop()
-            print(f'r - {residual_x.shape}')
-            print(f'r - {x.shape}')
+            # print(f'r - {residual_x.shape}')
+            # print(f'r - {x.shape}')
             # Add residual x as additional channels
             x = torch.cat((x, residual_x), dim=1)           
             x = up(x, t)
