@@ -5,6 +5,7 @@ This function is the implementation of the class that handles the noise schedule
 import os
 
 import torch
+import torchvision
 import torchaudio
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
@@ -31,14 +32,14 @@ class BetaScheduler:
         else:
             raise NotImplementedError()
 
-    def get_index_from_list(self, vals, t, x_shape):
+    def get_index_from_list(self, vals, t, x_shape, device='cuda'):
         """ 
         Returns a specific index t of a passed list of values vals while considering the batch
         dimension.
         """
         batch_size = t.shape[0]
         # out = vals.gather(-1, t.cpu())
-        out = vals.gather(-1, t.cuda())
+        out = vals.gather(-1, t.to(device)) # TODO: SEE IF THIS BREAKS IT ;(
         return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
     
     def forward_diffusion_sample(self, x_0, t, device):
@@ -124,29 +125,29 @@ class BetaScheduler:
         plt.show()      
     
     @torch.no_grad()
-    def save_wav_to_wavs_dir(self, model, save_dir, epoch_num, WAV_SIZE, sample_rate, device):
+    def save_img(self, model, save_dir, epoch_num, IMG_SHAPE, device):
         # Create epoch folder
         epoch_folder_name = os.path.join(save_dir, str(epoch_num))
         if not os.path.isdir(epoch_folder_name):
             os.mkdir(epoch_folder_name)
 
         # Sample noise
-        wav = torch.randn((1, 1, WAV_SIZE), device=device)
-        NUM_WAVS_TO_SAVE = 5
-        stepsize = int(self.T / NUM_WAVS_TO_SAVE)
+        img = torch.randn((1, IMG_SHAPE), device=device)
+        NUM_IMG_TO_SAVE = 5
+        save_stepsize = int(self.T / NUM_IMG_TO_SAVE)
 
         for i in range(0, self.T)[::-1]:
             t = torch.full((1,), i, device=device, dtype=torch.long)
-            wav = self.sample_timestep(wav, t, model)
+            img = self.sample_timestep(img, t, model)
+
+            # Save img at the end
             if i==0:
-                # Take first wav of batch
-                if len(wav.shape) == 3:
-                    wav_to_save = wav[0, :, :] 
-                    # plt.subplot(1, num_imgs, int(i/stepsize+1))
+                # Take first img of batch
+                if len(img.shape) == 4:
+                    img_to_save = img[0, :, :] 
+                else:
+                    img_to_save = img
                 
-                # img_to_save_transformed = reverse_transforms(img_to_save)
-                # img_to_save_transformed.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
+                # TODO: Implement transform compatability
+                torchvision.utils.save_image(img_to_save.cpu(), os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
         
-                # Save the wavform
-                # print('Saving wavform...')
-                torchaudio.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.wav'), wav_to_save.to('cpu'), sample_rate)

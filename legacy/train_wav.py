@@ -54,8 +54,10 @@ def save_model(model, model_dir, epoch_num):
     print(f'Saved model -> {this_model_path}')
 
 
-def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape):
-    # Set parameters for training
+def train_model(train_dir, data, model, loss_type, epochs, batch_size, wav_size):
+    # CONSTANTS WE NEED
+    SAMPLE_RATE = 44100
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     optimizer = Adam(model.parameters(), lr=0.001)
@@ -63,11 +65,8 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape
     noise_schedule = BetaScheduler(T=300)
 
     for epoch in range(epochs):
-        # Print every 5 Epochs
         if epoch % 5 == 0:
             print(f'Epoch {epoch}...')
-
-        # Iterate through data each epoch
         for step, batch in enumerate(data):
             optimizer.zero_grad()
 
@@ -82,26 +81,36 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape
             print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
 
             if epoch % 20 == 0 and step == 0 and epoch != 0:
-                print('Saving img...')
-                noise_schedule.save_img(model, train_dir, epoch, img_shape, device)
+                print('Saving wav...')
+                noise_schedule.save_wav_to_wavs_dir(model, train_dir, epoch, wav_size, SAMPLE_RATE, device)
 
 def main():
-    # Set Training Hyperparameters
-    LOSS_TYPE = 'l1'
-    NUM_EPOCHS = 100
-    BATCH_SIZE = 4
-
     # Set training parameters
     DATA_DIR = '../data' if os.path.isdir('../data') else 'data'
+
     TRAINING_FOLDER_LOCATION = os.path.join(*[os.path.dirname(os.path.abspath(__file__)), 'runs', datetime.now().strftime('%m-%d_%H_%M_%S')])
 
     print(f'Training location - {TRAINING_FOLDER_LOCATION}')
 
     if not os.path.isdir(TRAINING_FOLDER_LOCATION):
         os.mkdir(TRAINING_FOLDER_LOCATION)
+    
+    # Set Hyperparameters
+    LOSS_TYPE = 'l1'
+    NUM_EPOCHS = 100
+    BATCH_SIZE = 4
 
     # Get Data
     dataloader, num_frames_in_waveform = get_data(DATA_DIR, BATCH_SIZE)
+
+    # # THE BELOW IS FOR THE DUMMY DATA
+    # dummy_data = DummyAudioDataset(
+    #         root_dir=DATA_DIR,
+    #         song_offset=10,
+    #         song_duration=10,
+    #         transform=None
+    #     )
+    # dataloader = DataLoader(dummy_data, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
 
     # Get Model
     model = SimpleUnet()

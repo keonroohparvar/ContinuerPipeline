@@ -15,7 +15,7 @@ print(parent_path)
 
 # Local imports
 from data_pipeline.SpectrogramConverter import SpectrogramConverter
-from data_pipeline.spectrogram_params import SpectrogramParams
+from data_pipeline.SpectrogramParams import SpectrogramParams
 
 params = {
     

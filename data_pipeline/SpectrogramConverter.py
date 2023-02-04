@@ -9,7 +9,7 @@ import pydub
 import torch
 import torchaudio
 
-from .spectrogram_params import SpectrogramParams
+from .SpectrogramParams import SpectrogramParams
 from . import audio_util
 from . import torch_util
 
