@@ -55,9 +55,7 @@ class AudioDataset(Dataset):
         This uses the SpectrogramConverter class to convert our Spectrograms to waveforms
         which we will be using for our training.
         """
-
-
-       
+        return self.spec_converter.audio_from_spectrogram(spec, apply_filters=False) # TODO: See if this changes anything
 
     def __len__(self):
         return len(self.song_paths)
