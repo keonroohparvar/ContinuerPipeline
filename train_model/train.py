@@ -69,10 +69,14 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape
 
         # Iterate through data each epoch
         for step, batch in enumerate(data):
+            print(f'batch shape: {batch.shape}')
+            exit()
             optimizer.zero_grad()
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
             x_noisy, noise = noise_schedule.forward_diffusion_sample(batch, t, device)
+            print('x_noisy shape')
+            print(x_noisy.shape)
             noise_pred = model(x_noisy, t)
 
             loss = loss_func.get_loss(noise, noise_pred)

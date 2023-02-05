@@ -23,7 +23,7 @@ params = {
     'sr': 44100
 }
 
-path_to_wav = '/home/keonroohparvar/2022-2023/winter/csc597/JazzBot/data/Breezin.wav'
+path_to_wav = '../data/Breezin.wav'
 
 # waveform, sr = torchaudio.load(
 #     path_to_wav,

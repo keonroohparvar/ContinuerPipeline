@@ -11,16 +11,16 @@ class Block(nn.Module):
         self.time_mlp =  nn.Linear(time_embedding_dim, out_channel)
 
         if up:
-            self.conv1 = nn.Conv1d(2*in_channel, out_channel, 3, padding=1)
-            self.transform = nn.ConvTranspose1d(out_channel, out_channel, 4, 2, padding=1)
+            self.conv1 = nn.Conv2d(2*in_channel, out_channel, 3, padding=1)
+            self.transform = nn.ConvTranspose2d(out_channel, out_channel, 4, 2, padding=1)
 
         else:
-            self.conv1 = nn.Conv1d(in_channel, out_channel, 3, padding=1)
-            self.transform = nn.Conv1d(out_channel, out_channel, 4, 2, padding=1)
+            self.conv1 = nn.Conv2d(in_channel, out_channel, 3, padding=1)
+            self.transform = nn.Conv2d(out_channel, out_channel, 4, 2, padding=1)
 
-        self.conv2 = nn.Conv1d(out_channel, out_channel, 3, padding=1)
-        self.bnorm1 = nn.BatchNorm1d(out_channel)
-        self.bnorm2 = nn.BatchNorm1d(out_channel)
+        self.conv2 = nn.Conv2d(out_channel, out_channel, 3, padding=1)
+        self.bnorm1 = nn.BatchNorm2d(out_channel)
+        self.bnorm2 = nn.BatchNorm2d(out_channel)
         self.relu  = nn.ReLU()
     
     def forward(self, x, t):
