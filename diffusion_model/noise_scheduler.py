@@ -14,6 +14,9 @@ import numpy as np
 
 class BetaScheduler:
     def __init__(self, T, type='linear', device='cuda'):
+        # Set device
+        self.device=device
+        
         # Set Type
         self.type = type
 
@@ -59,9 +62,9 @@ class BetaScheduler:
         self.posterior_variance = self.betas * (1. - self.alphas_cumprod_prev) / (1. - self.alphas_cumprod)
 
         noise = torch.randn_like(x_0)
-        self.sqrt_alphas_cumprod_t = self.get_index_from_list(self.sqrt_alphas_cumprod, t, x_0.shape)
+        self.sqrt_alphas_cumprod_t = self.get_index_from_list(self.sqrt_alphas_cumprod, t, x_0.shape, device)
         sqrt_one_minus_alphas_cumprod_t = self.get_index_from_list(
-            self.sqrt_one_minus_alphas_cumprod, t, x_0.shape
+            self.sqrt_one_minus_alphas_cumprod, t, x_0.shape, device
         )
         # mean + variance
         return self.sqrt_alphas_cumprod_t.to(device) * x_0.to(device) \

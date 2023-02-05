@@ -60,7 +60,7 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape
     model.to(device)
     optimizer = Adam(model.parameters(), lr=0.001)
     loss_func = LossFunction(loss_type)
-    noise_schedule = BetaScheduler(T=300)
+    noise_schedule = BetaScheduler(T=300, device=device)
 
     for epoch in range(epochs):
         # Print every 5 Epochs
