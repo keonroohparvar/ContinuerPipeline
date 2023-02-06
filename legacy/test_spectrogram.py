@@ -6,6 +6,7 @@ import torchaudio
 import sys
 import os
 import pydub
+import numpy as np
 
 # Add parent dir to path
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,8 +32,30 @@ path_to_wav = '../data/Breezin.wav'
 waveform = pydub.AudioSegment.from_file(path_to_wav, format='wav', duration=20)
 
 
-print(waveform)
-print(type(waveform))
+# print(wavefoVjrm)
+# print(type(waveform))
+"""
+frames = floor((N - w) / step) + 1
+
+sr = 44100
+window_duration_ms = 11020
+win_length = int(self.window_duration_ms / 1000.0 * self.sample_rate)
+step_size_ms = 10
+hop_length = int(self.step_size_ms / 1000.0 * self.sample_rate)
+
+=>
+N = (882000,)
+w = 485982
+h = 441
+
+
+frames = floor((882000 - 485982) / 441) + 1
+
+frames = 2001?
+"""
+arr = np.array(waveform.get_array_of_samples())
+print(arr)
+print(arr.shape)
 
 params = SpectrogramParams()
 sc = SpectrogramConverter(params=params)
@@ -41,6 +64,8 @@ spec = sc.spectrogram_from_audio(waveform)
 
 print(spec)
 print(spec.shape)
+
+exit()
 
 audio_reconstructed = sc.audio_from_spectrogram(spec)
 print(audio_reconstructed)

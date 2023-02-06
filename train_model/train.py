@@ -70,7 +70,7 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape
         # Iterate through data each epoch
         for step, batch in enumerate(data):
             print(f'batch shape: {batch.shape}')
-            exit()
+            
             optimizer.zero_grad()
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()

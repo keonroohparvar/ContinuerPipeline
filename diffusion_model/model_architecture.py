@@ -14,11 +14,13 @@ class SimpleUnet(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        image_channels = 3
+        image_channels = 1
 
         # Defining Challens
-        down_channels = (64, 128, 256, 256, 256, 256)
-        up_channels = (256, 256, 256, 256, 128, 64)
+        # down_channels = (64, 128, 256, 256, 256, 256)
+        # up_channels = (256, 256, 256, 256, 128, 64)
+        down_channels = (64, 128, 256)
+        up_channels = (256, 128, 64)
 
         out_dim = 1 
         time_emb_dim = 32
@@ -60,7 +62,7 @@ class SimpleUnet(nn.Module):
 
         for down in self.downs:
             x = down(x, t)
-            # print(x.shape)
+            print(x.shape)
             residual_inputs.append(x)
             
         # Prints for debugging
@@ -69,7 +71,7 @@ class SimpleUnet(nn.Module):
 
         for up in self.ups:
             residual_x = residual_inputs.pop()
-            # print(f'r - {residual_x.shape}')
+            print(f'r - {residual_x.shape}')
             # print(f'r - {x.shape}')
             # Add residual x as additional channels
             x = torch.cat((x, residual_x), dim=1)           
