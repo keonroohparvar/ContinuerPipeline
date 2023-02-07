@@ -31,32 +31,6 @@ path_to_wav = '../data/Breezin.wav'
 #     num_frames = params['sr'] * 10)
 waveform = pydub.AudioSegment.from_file(path_to_wav, format='wav', duration=20)
 
-
-# print(wavefoVjrm)
-# print(type(waveform))
-"""
-frames = floor((N - w) / step) + 1
-
-sr = 44100
-window_duration_ms = 11020
-win_length = int(self.window_duration_ms / 1000.0 * self.sample_rate)
-step_size_ms = 10
-hop_length = int(self.step_size_ms / 1000.0 * self.sample_rate)
-
-=>
-N = (882000,)
-w = 485982
-h = 441
-
-
-frames = floor((882000 - 485982) / 441) + 1
-
-frames = 2001?
-"""
-arr = np.array(waveform.get_array_of_samples())
-print(arr)
-print(arr.shape)
-
 params = SpectrogramParams()
 sc = SpectrogramConverter(params=params)
 
@@ -65,10 +39,14 @@ spec = sc.spectrogram_from_audio(waveform)
 print(spec)
 print(spec.shape)
 
-exit()
-
 audio_reconstructed = sc.audio_from_spectrogram(spec)
 print(audio_reconstructed)
 
-out_path = '/home/keonroohparvar/2022-2023/winter/csc597/JazzBot/train_model/test/test.wav'
-audio_reconstructed.export(out_f=out_path, format='wav')
+spec_reduced = spec[:, :, :1024]
+print(spec_reduced.shape)
+
+audio_reduced_reconstructed = sc.audio_from_spectrogram(spec_reduced)
+
+out_path = 'test/'
+audio_reconstructed.export(out_f=os.path.join(out_path, 'original_reconstructed.wav'), format='wav')
+audio_reduced_reconstructed.export(out_f=os.path.join(out_path, 'reduced_reconstructed.wav'), format='wav')
