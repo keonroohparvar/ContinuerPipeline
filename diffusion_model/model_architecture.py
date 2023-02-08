@@ -22,6 +22,9 @@ class SimpleUnet(nn.Module):
         down_channels = (64, 128, 256)
         up_channels = (256, 128, 64)
 
+        assert len(down_channels) == len(up_channels)
+        self.num_convolutions = len(down_channels)
+
         out_dim = 1 
         time_emb_dim = 32
 
@@ -44,16 +47,16 @@ class SimpleUnet(nn.Module):
                                         time_emb_dim, up=True) \
                     for i in range(len(up_channels)-1)])
 
-        self.output = nn.Conv2d(up_channels[-1], 3, out_dim)
-
+        self.output = nn.Conv2d(up_channels[-1], out_dim, 3, padding=1)
+    
     def forward(self, x, timestep):
-        # Embedd time
+        # print(f'Initial x shape: {x.shape}')
+
+        # Embed time
         t = self.time_mlp(timestep)
         # Initial conv
-        # print(f'x shpae before: {x.shape}')
         x = self.conv0(x)
         # print(f'x shpae after: {x.shape}')
-        # Unet
         residual_inputs = []
 
         # Prints for debugging
@@ -62,7 +65,7 @@ class SimpleUnet(nn.Module):
 
         for down in self.downs:
             x = down(x, t)
-            print(x.shape)
+            # print(x.shape)
             residual_inputs.append(x)
             
         # Prints for debugging
@@ -71,10 +74,12 @@ class SimpleUnet(nn.Module):
 
         for up in self.ups:
             residual_x = residual_inputs.pop()
-            print(f'r - {residual_x.shape}')
+            # print(f'r - {residual_x.shape}')
             # print(f'r - {x.shape}')
             # Add residual x as additional channels
             x = torch.cat((x, residual_x), dim=1)           
             x = up(x, t)
+
+        # print(f'x shape after up: {x.shape}')
         return self.output(x)
         

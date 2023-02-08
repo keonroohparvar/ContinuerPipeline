@@ -15,13 +15,6 @@ import torchaudio
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-# Print cuda availability
-if torch.cuda.is_available():
-    print(f'Cuda is available!')
-    torch.cuda.set_device(0)
-else:
-    print(f'Cuda is not available :(')
-
 # Add parent dir to path
 parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_path)
@@ -34,12 +27,13 @@ from diffusion_model.noise_scheduler import BetaScheduler
 from diffusion_model.time_embedding import SinusoidalPositionEmbeddings
 from diffusion_model.model_architecture import SimpleUnet
 
-def get_data(image_dir, batch_size):
+def get_data(image_dir, batch_size, device):
     data = AudioDataset(
             root_dir=image_dir,
             song_offset=10,
             song_duration=5,
-            transform=None # SEE IF WE NEED TO CHANGE THIS
+            transform=None, # SEE IF WE NEED TO CHANGE THIS
+            device=device
         )
 
     size_of_waveforms = data.num_frames_of_waveform
@@ -54,9 +48,8 @@ def save_model(model, model_dir, epoch_num):
     print(f'Saved model -> {this_model_path}')
 
 
-def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape):
+def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape, device):
     # Set parameters for training
-    device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     optimizer = Adam(model.parameters(), lr=0.001)
     loss_func = LossFunction(loss_type)
@@ -69,15 +62,19 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape
 
         # Iterate through data each epoch
         for step, batch in enumerate(data):
-            print(f'batch shape: {batch.shape}')
+            # print(f'batch shape: {batch.shape}')
             
             optimizer.zero_grad()
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
             x_noisy, noise = noise_schedule.forward_diffusion_sample(batch, t, device)
-            print('x_noisy shape')
-            print(x_noisy.shape)
             noise_pred = model(x_noisy, t)
+
+            # # Prints for debugging!
+            # print(f'batch shape: {batch.shape}')
+            # print(f'x noisy shape: {x_noisy.shape}')
+            # print(f'noise_pred shape: {noise_pred.shape}')
+            # print(f'noise shape: {noise.shape}')
 
             loss = loss_func.get_loss(noise, noise_pred)
             loss.backward()
@@ -99,21 +96,20 @@ def main():
     DATA_DIR = '../data' if os.path.isdir('../data') else 'data'
     TRAINING_FOLDER_LOCATION = os.path.join(*[os.path.dirname(os.path.abspath(__file__)), 'runs', datetime.now().strftime('%m-%d_%H_%M_%S')])
 
-    print(f'Training location - {TRAINING_FOLDER_LOCATION}')
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    print(f'Training location - {TRAINING_FOLDER_LOCATION}')
     if not os.path.isdir(TRAINING_FOLDER_LOCATION):
         os.mkdir(TRAINING_FOLDER_LOCATION)
 
     # Get Data
-    dataloader, num_frames_in_waveform = get_data(DATA_DIR, BATCH_SIZE)
+    dataloader, num_frames_in_waveform = get_data(DATA_DIR, BATCH_SIZE, device)
 
     # Get Model
     model = SimpleUnet()
 
     # Train model
-    train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE, num_frames_in_waveform)
-
-
+    train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE, num_frames_in_waveform, device)
 
 if __name__ == '__main__': 
     main()

@@ -31,8 +31,6 @@ class Block(nn.Module):
         # Extend last 2 dimensions
         time_emb = time_emb[(..., ) + (None, ) * 2]
         # Add time channel
-        print(f'h shape: {h.shape}')
-        print(f'Time emb shape: {time_emb.shape}')
         h = h + time_emb
         # Second Conv
         h = self.bnorm2(self.relu(self.conv2(h)))

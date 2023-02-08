@@ -37,8 +37,6 @@ class AudioDataset(Dataset):
         num_frames = sample_rate * self.song_duration
         num_frames_div_by = 2**NUMBER_OF_CONVOLUTIONS
         num_frames_of_waveform = num_frames - (num_frames % num_frames_div_by)
-
-        print(f'Waveform size: {num_frames_of_waveform}')
         
         return num_frames_of_waveform
 
@@ -48,7 +46,13 @@ class AudioDataset(Dataset):
         which we will be using for our training.
         """
         return self.spec_converter.spectrogram_from_audio(x)
-    
+
+    def _input_size_calculation(self, length, num_convolutions):
+        """
+        This shortens the length of the data to allow it to be convoluded down without issues in
+        our UNet Model.
+        """
+        return length - (length % (2 ** num_convolutions))
 
     def _convert_spec_to_waveform(self, spec):
         """
@@ -60,33 +64,21 @@ class AudioDataset(Dataset):
     def __len__(self):
         return len(self.song_paths)
     
+    
     def __getitem__(self, index):
         # Get path
         song_path = self.song_paths[index]
 
         # Get Metadata to find out how much to load
         metadata = torchaudio.info(song_path)
-        sample_rate = metadata.sample_rate
 
         waveform = pydub.AudioSegment.from_file(
             song_path, 
             format='wav', 
             duration=self.song_duration)
 
-        return self._convert_wav_to_spectrogram(waveform)
+        spec = self._convert_wav_to_spectrogram(waveform)
 
+        spec = spec[:, :, :self._input_size_calculation(spec.shape[2], num_convolutions=6)]
 
-        # waveform, _ = torchaudio.load(song, 
-        #                             frame_offset=sample_rate*self.song_offset, 
-        #                             num_frames=self.num_frames_of_waveform)
-        # self.sample_rates[song_path] = sample_rate
-        # 
-        # if self.transform:
-        #     waveform = self.transform(waveform)
-        # 
-        # return waveform
-
-
-
-
-
+        return spec
