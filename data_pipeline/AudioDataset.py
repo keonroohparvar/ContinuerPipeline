@@ -13,12 +13,13 @@ from .SpectrogramParams import SpectrogramParams
 
 
 class AudioDataset(Dataset):
-    def __init__(self, root_dir, song_offset, song_duration, sample_rate=44100, transform=None, device='cuda'):
+    def __init__(self, root_dir, song_offset, song_duration, number_of_convolutions=6, sample_rate=44100, transform=None, device='cuda'):
         self.root_dir = root_dir
         self.song_duration = song_duration
         self.song_offset = song_offset
 
-        self.num_frames_of_waveform = self._format_len_of_song(sample_rate)
+        # Save number of convolutions which will determine the size of our spectrograms
+        self.num_convolutions = number_of_convolutions
 
         # Instantiate object to help convert between spectrograms <-> audio
         self.spec_converter = SpectrogramConverter(SpectrogramParams(), device=device)
@@ -28,17 +29,20 @@ class AudioDataset(Dataset):
         self.sample_rates = {}
 
         self.transform = transform
-         
-    def _format_len_of_song(self, sample_rate):
+
+    def _get_spec_shape(self):
         """
-        This function is used to make sure the length of the song is a power of 2
+        This will get the shape of a spectrogram which we will ultimately need when 
+        creating new spectrograms.
         """
-        NUMBER_OF_CONVOLUTIONS = 6
-        num_frames = sample_rate * self.song_duration
-        num_frames_div_by = 2**NUMBER_OF_CONVOLUTIONS
-        num_frames_of_waveform = num_frames - (num_frames % num_frames_div_by)
-        
-        return num_frames_of_waveform
+        example_wav = pydub.AudioSegment.from_file(
+            self.song_paths[0], 
+            format='wav', 
+            duration=self.song_duration)
+
+        spec =  self._convert_wav_to_spectrogram(example_wav)
+        spec = spec[:, :, :self._input_size_calculation(spec.shape[2], self.num_convolutions)]
+        return spec.shape
 
     def _convert_wav_to_spectrogram(self, x):
         """
@@ -64,7 +68,6 @@ class AudioDataset(Dataset):
     def __len__(self):
         return len(self.song_paths)
     
-    
     def __getitem__(self, index):
         # Get path
         song_path = self.song_paths[index]
@@ -79,6 +82,6 @@ class AudioDataset(Dataset):
 
         spec = self._convert_wav_to_spectrogram(waveform)
 
-        spec = spec[:, :, :self._input_size_calculation(spec.shape[2], num_convolutions=6)]
+        spec = spec[:, :, :self._input_size_calculation(spec.shape[2], self.num_convolutions)]
 
         return spec

@@ -4,6 +4,9 @@ This function is the implementation of the class that handles the noise schedule
 
 import os
 
+import sys
+
+
 import torch
 import torchvision
 import torchaudio
@@ -11,6 +14,11 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Add path to data_pipeline/ folder
+parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_path)
+from data_pipeline.SpectrogramImageConverter import SpectrogramImageConverter
+from data_pipeline.SpectrogramParams import SpectrogramParams
 
 class BetaScheduler:
     def __init__(self, T, type='linear', device='cuda'):
@@ -127,15 +135,19 @@ class BetaScheduler:
                 self.show_tensor_image(img.detach().cpu())
         plt.show()      
     
-    @torch.no_grad()
-    def save_img(self, model, save_dir, epoch_num, IMG_SHAPE, device):
+    # @torch.no_grad()
+    def save_wav(self, model, save_dir, epoch_num, spectrogram_shape, device):
+        # Create spectrogram converter object
+        spec_params = SpectrogramParams()
+        spec_converter = SpectrogramImageConverter(params=spec_params, device=device)
+
         # Create epoch folder
         epoch_folder_name = os.path.join(save_dir, str(epoch_num))
         if not os.path.isdir(epoch_folder_name):
             os.mkdir(epoch_folder_name)
 
         # Sample noise
-        img = torch.randn((1, IMG_SHAPE), device=device)
+        img = torch.randn((1, *spectrogram_shape), device=device)
         NUM_IMG_TO_SAVE = 5
         save_stepsize = int(self.T / NUM_IMG_TO_SAVE)
 
@@ -143,14 +155,27 @@ class BetaScheduler:
             t = torch.full((1,), i, device=device, dtype=torch.long)
             img = self.sample_timestep(img, t, model)
 
-            # Save img at the end
+            # Save imgs throughout
+            # if i % 10 == 0:
+            #     if len(img.shape) == 4:
+            #         img_to_save = img[0, :, :] 
+            #     else:
+            #         img_to_save = img
+                
+            #     torchvision.utils.save_image(img_to_save.cpu(), os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
+
+            # Save waveform at the end
             if i==0:
                 # Take first img of batch
                 if len(img.shape) == 4:
                     img_to_save = img[0, :, :] 
                 else:
                     img_to_save = img
+
+                # Change to PIL
+                img_to_save = torchvision.transforms.ToPILImage()(img_to_save) 
+
+                wav_to_save = spec_converter.audio_from_spectrogram_image(img_to_save, apply_filters=False)
+                wav_to_save.export(os.path.join(epoch_folder_name, f'epoch{epoch_num}.wav'), format='wav')
                 
-                # TODO: Implement transform compatability
-                torchvision.utils.save_image(img_to_save.cpu(), os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
         

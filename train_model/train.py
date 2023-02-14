@@ -36,11 +36,9 @@ def get_data(image_dir, batch_size, device):
             device=device
         )
 
-    size_of_waveforms = data.num_frames_of_waveform
-
     dataloader = DataLoader(data, batch_size=batch_size, shuffle=True, drop_last=True)
 
-    return dataloader, size_of_waveforms
+    return dataloader, data._get_spec_shape()
 
 def save_model(model, model_dir, epoch_num):
     this_model_path = os.path.join(model_dir, f'model_{str(epoch_num)}')
@@ -48,7 +46,7 @@ def save_model(model, model_dir, epoch_num):
     print(f'Saved model -> {this_model_path}')
 
 
-def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape, device):
+def train_model(train_dir, data, model, loss_type, epochs, batch_size, spectrogram_shape, device):
     # Set parameters for training
     model.to(device)
     optimizer = Adam(model.parameters(), lr=0.001)
@@ -82,9 +80,10 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, img_shape
 
             print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
 
-            if epoch % 20 == 0 and step == 0 and epoch != 0:
-                print('Saving img...')
-                noise_schedule.save_img(model, train_dir, epoch, img_shape, device)
+            # if epoch % 20 == 0 and step == 0 and epoch != 0:
+            if epoch % 20 == 0 and step == 0:
+                print('Saving wav and images...')
+                noise_schedule.save_wav(model, train_dir, epoch, spectrogram_shape, device)
 
 def main():
     # Set Training Hyperparameters
@@ -103,13 +102,13 @@ def main():
         os.mkdir(TRAINING_FOLDER_LOCATION)
 
     # Get Data
-    dataloader, num_frames_in_waveform = get_data(DATA_DIR, BATCH_SIZE, device)
+    dataloader, spectrogram_shape = get_data(DATA_DIR, BATCH_SIZE, device)
 
     # Get Model
     model = SimpleUnet()
 
     # Train model
-    train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE, num_frames_in_waveform, device)
+    train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE, spectrogram_shape, device)
 
 if __name__ == '__main__': 
     main()

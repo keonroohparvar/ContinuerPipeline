@@ -37,6 +37,7 @@ sc = SpectrogramConverter(params=params)
 spec = sc.spectrogram_from_audio(waveform)
 
 print(spec)
+print(type(spec))
 print(spec.shape)
 
 audio_reconstructed = sc.audio_from_spectrogram(spec)
@@ -48,5 +49,5 @@ print(spec_reduced.shape)
 audio_reduced_reconstructed = sc.audio_from_spectrogram(spec_reduced)
 
 out_path = 'test/'
-audio_reconstructed.export(out_f=os.path.join(out_path, 'original_reconstructed.wav'), format='wav')
-audio_reduced_reconstructed.export(out_f=os.path.join(out_path, 'reduced_reconstructed.wav'), format='wav')
+# audio_reconstructed.export(out_f=os.path.join(out_path, 'original_reconstructed.wav'), format='wav')
+# audio_reduced_reconstructed.export(out_f=os.path.join(out_path, 'reduced_reconstructed.wav'), format='wav')

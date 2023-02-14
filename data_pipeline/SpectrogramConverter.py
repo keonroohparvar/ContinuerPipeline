@@ -130,7 +130,7 @@ class SpectrogramConverter:
 
     def audio_from_spectrogram(
         self,
-        spectrogram: np.ndarray,
+        spectrogram,
         apply_filters: bool = True,
     ) -> pydub.AudioSegment:
         """
@@ -144,7 +144,12 @@ class SpectrogramConverter:
             audio: Audio segment with channels equal to the batch dimension
         """
         # Move to device
-        amplitudes_mel = torch.from_numpy(spectrogram).to(self.device)
+        if type(spectrogram) == np.ndarray:
+            amplitudes_mel = torch.from_numpy(spectrogram).to(self.device)
+        elif type(spectrogram) == torch.Tensor:
+            amplitudes_mel = spectrogram.to(self.device)
+        else:
+            raise(TypeError)
 
         # Reconstruct the waveform
         waveform = self.waveform_from_mel_amplitudes(amplitudes_mel)
