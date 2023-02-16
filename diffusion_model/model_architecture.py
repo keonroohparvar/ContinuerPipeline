@@ -14,18 +14,20 @@ class SimpleUnet(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        image_channels = 1
+        image_channels = 3
 
         # Defining Challens
+        down_channels = (64, 128, 256, 512, 1024)
+        up_channels = (1024, 512, 256, 128, 64)
         # down_channels = (64, 128, 256, 256, 256, 256)
         # up_channels = (256, 256, 256, 256, 128, 64)
-        down_channels = (64, 128, 256)
-        up_channels = (256, 128, 64)
+        # down_channels = (64, 128, 256)
+        # up_channels = (256, 128, 64)
 
         assert len(down_channels) == len(up_channels)
         self.num_convolutions = len(down_channels)
 
-        out_dim = 1 
+        out_dim = 3 
         time_emb_dim = 32
 
         # Time embedding
@@ -56,7 +58,7 @@ class SimpleUnet(nn.Module):
         t = self.time_mlp(timestep)
         # Initial conv
         x = self.conv0(x)
-        # print(f'x shpae after: {x.shape}')
+        # print(f'x shape after: {x.shape}')
         residual_inputs = []
 
         # Prints for debugging
@@ -65,7 +67,6 @@ class SimpleUnet(nn.Module):
 
         for down in self.downs:
             x = down(x, t)
-            # print(x.shape)
             residual_inputs.append(x)
             
         # Prints for debugging

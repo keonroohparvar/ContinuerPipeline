@@ -60,6 +60,7 @@ class BetaScheduler:
         """
         # print('x shape')
         # print(x_0.shape)
+        # print(x_0.dtype)
         # Terms calculated in closed form
         self.alphas = (1. - self.betas).to(device)
         self.alphas_cumprod = torch.cumprod(self.alphas, axis=0)
@@ -137,6 +138,7 @@ class BetaScheduler:
     
     # @torch.no_grad()
     def save_wav(self, model, save_dir, epoch_num, spectrogram_shape, device):
+        print(f'Spec shape is :{spectrogram_shape} ')
         # Create spectrogram converter object
         spec_params = SpectrogramParams()
         spec_converter = SpectrogramImageConverter(params=spec_params, device=device)
@@ -156,13 +158,13 @@ class BetaScheduler:
             img = self.sample_timestep(img, t, model)
 
             # Save imgs throughout
-            # if i % 10 == 0:
-            #     if len(img.shape) == 4:
-            #         img_to_save = img[0, :, :] 
-            #     else:
-            #         img_to_save = img
+            if i % save_stepsize == 0:
+                if len(img.shape) == 4:
+                    img_to_save = img[0, :, :] 
+                else:
+                    img_to_save = img
                 
-            #     torchvision.utils.save_image(img_to_save.cpu(), os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
+                torchvision.utils.save_image(img_to_save.cpu(), os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
 
             # Save waveform at the end
             if i==0:

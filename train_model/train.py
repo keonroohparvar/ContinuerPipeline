@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 import torch
-import torchaudio
+import torchvision
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
@@ -27,12 +27,13 @@ from diffusion_model.noise_scheduler import BetaScheduler
 from diffusion_model.time_embedding import SinusoidalPositionEmbeddings
 from diffusion_model.model_architecture import SimpleUnet
 
-def get_data(image_dir, batch_size, device):
+def get_data(image_dir, batch_size, number_of_convolutions, device):
     data = AudioDataset(
             root_dir=image_dir,
             song_offset=10,
             song_duration=5,
             transform=None, # SEE IF WE NEED TO CHANGE THIS
+            number_of_convolutions= number_of_convolutions,
             device=device
         )
 
@@ -40,28 +41,37 @@ def get_data(image_dir, batch_size, device):
 
     return dataloader, data._get_spec_shape()
 
-def save_model(model, model_dir, epoch_num):
-    this_model_path = os.path.join(model_dir, f'model_{str(epoch_num)}')
+def save_model(model, model_dir, model_name):
+    this_model_path = os.path.join(model_dir, model_name)
     torch.save(model.state_dict(), this_model_path)
     print(f'Saved model -> {this_model_path}')
 
 
-def train_model(train_dir, data, model, loss_type, epochs, batch_size, spectrogram_shape, device):
+def save_information(train_dir, num_epochs, batch_size, loss_type, learning_rate):
+    str_to_save = []
+    str_to_save.append(f'Number of Epochs - {num_epochs}')
+    str_to_save.append(f'Batch Size - {batch_size}')
+    str_to_save.append(f'Loss Type - {loss_type}')
+    str_to_save.append(f'Learning Rate - {learning_rate}')
+
+    with open(os.path.join(train_dir, 'information.txt'), 'w') as f:
+        f.write("\n".join(str_to_save))
+
+
+
+def train_model(train_dir, data, model, loss_type, epochs, batch_size, learning_rate, spectrogram_shape, device):
     # Set parameters for training
     model.to(device)
-    optimizer = Adam(model.parameters(), lr=0.001)
+    optimizer = Adam(model.parameters(), lr=learning_rate)
     loss_func = LossFunction(loss_type)
     noise_schedule = BetaScheduler(T=300, device=device)
 
-    for epoch in range(epochs):
-        # Print every 5 Epochs
-        if epoch % 5 == 0:
-            print(f'Epoch {epoch}...')
+    # Save infomration about training to this run's directory
+    save_information(train_dir, epochs, batch_size, loss_type, learning_rate)
 
+    for epoch in range(epochs):
         # Iterate through data each epoch
         for step, batch in enumerate(data):
-            # print(f'batch shape: {batch.shape}')
-            
             optimizer.zero_grad()
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
@@ -74,22 +84,36 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, spectrogr
             # print(f'noise_pred shape: {noise_pred.shape}')
             # print(f'noise shape: {noise.shape}')
 
+            # Saves example spectrogram to temp/ folder
+            if not os.path.isdir(os.path.join(train_dir, 'spectrograms')):
+                os.makedirs(os.path.join(train_dir, 'spectrograms'))
+            if epoch == 0:
+                for idx, item in enumerate(batch):
+                    torchvision.utils.save_image(item, os.path.join(train_dir, 'spectrograms', f'spec_step{step}_{idx}.jpg') )
+                    
+
             loss = loss_func.get_loss(noise, noise_pred)
             loss.backward()
             optimizer.step()
 
-            print(f"Epoch {epoch} | step {step:03d} Loss: {loss.item()} ")
-
-            # if epoch % 20 == 0 and step == 0 and epoch != 0:
-            if epoch % 20 == 0 and step == 0:
+            # if epoch % 20 == 0 and step == 0: 
+            if epoch % 20 == 0 and step == 0 and epoch != 0:
                 print('Saving wav and images...')
                 noise_schedule.save_wav(model, train_dir, epoch, spectrogram_shape, device)
+
+        # Print results every few Epochs
+        if epoch % 5 == 0:
+            # print(f'Epoch {epoch}...')
+            print(f"Epoch {epoch} | Loss: {loss.item()} ")
+
+    save_model(model, train_dir, model_name='trained_model')
 
 def main():
     # Set Training Hyperparameters
     LOSS_TYPE = 'l1'
     NUM_EPOCHS = 100
-    BATCH_SIZE = 4
+    BATCH_SIZE = 1
+    LEARNING_RATE = 1e-3
 
     # Set training parameters
     DATA_DIR = '../data' if os.path.isdir('../data') else 'data'
@@ -101,14 +125,14 @@ def main():
     if not os.path.isdir(TRAINING_FOLDER_LOCATION):
         os.mkdir(TRAINING_FOLDER_LOCATION)
 
-    # Get Data
-    dataloader, spectrogram_shape = get_data(DATA_DIR, BATCH_SIZE, device)
-
     # Get Model
     model = SimpleUnet()
 
+    # Get Data
+    dataloader, spectrogram_shape = get_data(DATA_DIR, BATCH_SIZE, model.num_convolutions, device)
+
     # Train model
-    train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE, spectrogram_shape, device)
+    train_model(TRAINING_FOLDER_LOCATION, dataloader, model, LOSS_TYPE, NUM_EPOCHS, BATCH_SIZE, LEARNING_RATE, spectrogram_shape, device)
 
 if __name__ == '__main__': 
     main()
