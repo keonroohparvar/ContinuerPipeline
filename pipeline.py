@@ -4,12 +4,16 @@ import os
 import numpy as np
 import torch
 
-from diffusers import DiffusionPipeline, StableDiffusionPipeline
+from diffusers import StableDiffusionPipeline
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from PIL import Image
+import PIL
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
+# Local imports
+from data.util.SpectrogramConverter import SpectrogramConverter
+from data.util.SpectrogramParams import SpectrogramParams
 
 class JazzPipeline(StableDiffusionPipeline):
     def __init__(
@@ -208,10 +212,45 @@ class JazzPipeline(StableDiffusionPipeline):
     def device(self) -> str:
         return str(self.vae.device)
     
-    @property 
-    def img_size(self) -> tuple(int, int):
-        return (512, 512)
+    # @property 
+    # def img_size(self) -> tuple(int, int):
+    #     return (512, 512)
     
+    @classmethod
+    def convert_image_to_wav(
+        cls,
+        img: Union[str, PIL.Image.Image],
+        out_location: Optional[str] = None
+    ):
+        """
+        Converts a spectrogram image to a waveform
+        """
+        if type(img) == str:
+            if not os.path.exists(img):
+                raise FileNotFoundError(f'The file {img} was not found.')
+            
+            spec = Image.open(img)
+            # Convert to black and white
+            spec = spec.convert("L")
+
+        elif type(img) == PIL.Image.Image:
+            spec = img
+        
+        else:
+            raise TypeError(f'The type {type(img)} for img is not supported.')
+        
+        spec = np.array([np.asarray(spec)], dtype=np.float32)
+        print(spec.shape)
+        
+        params = SpectrogramParams(sample_rate=22050)
+        spectrogram_converter = SpectrogramConverter(params)
+
+        wav_segment = spectrogram_converter.audio_from_spectrogram(spec)
+
+        if out_location is not None:
+            wav_segment.export(out_f=out_location, format='wav')
+
+        return wav_segment
 
     @torch.no_grad()
     def __call__(
@@ -316,8 +355,9 @@ class JazzPipeline(StableDiffusionPipeline):
         return image
 
 
+if __name__ == '__main__':
+    img = '/home/keonroohparvar/2022-2023/winter/csc597/JazzBot/jazz_img.png'
 
-
-
+    JazzPipeline.convert_image_to_wav(img, 'jazz.wav')
 
 
