@@ -19,6 +19,7 @@ parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_path)
 from data_pipeline.SpectrogramImageConverter import SpectrogramImageConverter
 from data_pipeline.SpectrogramParams import SpectrogramParams
+from data_pipeline import image_util
 
 class BetaScheduler:
     def __init__(self, T, type='linear', device='cuda'):
@@ -68,7 +69,7 @@ class BetaScheduler:
         self.sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
         self.sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - self.alphas_cumprod)
-        self.posterior_variance = self.betas * (1. - self.alphas_cumprod_prev) / (1. - self.alphas_cumprod)
+        self.posterior_variance = (self.betas).to(device) * (1. - self.alphas_cumprod_prev) / (1. - self.alphas_cumprod)
 
         noise = torch.randn_like(x_0)
         self.sqrt_alphas_cumprod_t = self.get_index_from_list(self.sqrt_alphas_cumprod, t, x_0.shape, device)
@@ -164,7 +165,9 @@ class BetaScheduler:
                 else:
                     img_to_save = img
                 
-                torchvision.utils.save_image(img_to_save.cpu(), os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
+                pil_image_to_save = image_util.image_from_spectrogram(img_to_save.cpu().numpy(), spec_converter.p.power_for_image)
+                # torchvision.utils.save_image(img_to_save.cpu(), os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
+                pil_image_to_save.save(os.path.join(epoch_folder_name, f'epoch{epoch_num}_step{i}.jpg'))
 
             # Save waveform at the end
             if i==0:
@@ -174,10 +177,11 @@ class BetaScheduler:
                 else:
                     img_to_save = img
 
-                # Change to PIL
-                img_to_save = torchvision.transforms.ToPILImage()(img_to_save) 
+                # # Change to PIL
+                # img_to_save = torchvision.transforms.ToPILImage()(img_to_save) 
+                spec_PIL = image_util.image_from_spectrogram(img_to_save.cpu().numpy(), spec_converter.p.power_for_image)
 
-                wav_to_save = spec_converter.audio_from_spectrogram_image(img_to_save, apply_filters=False)
+                wav_to_save = spec_converter.audio_from_spectrogram_image(spec_PIL) 
                 wav_to_save.export(os.path.join(epoch_folder_name, f'epoch{epoch_num}.wav'), format='wav')
                 
         
