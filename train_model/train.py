@@ -9,6 +9,7 @@ Date: November 30, 2022
 import sys
 import os
 from datetime import datetime
+import time
 
 import torch
 import torchvision
@@ -69,14 +70,18 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, learning_
     # Save infomration about training to this run's directory
     save_information(train_dir, epochs, batch_size, loss_type, learning_rate)
 
+    # Determine how many times to save results
+    NUM_CHECKPOINTS = 5
+    epochs_per_checkpoint = int(epochs / NUM_CHECKPOINTS) 
+
     for epoch in range(epochs):
         # Iterate through data each epoch
         for step, batch in enumerate(data):
             optimizer.zero_grad()
 
             t = torch.randint(0, noise_schedule.T, (batch_size,), device=device).long()
-            x_noisy, noise = noise_schedule.forward_diffusion_sample(batch, t, device)
-            noise_pred = model(x_noisy, t)
+            x_noisy, noise = noise_schedule.forward_diffusion_sample(batch, t, device=device)
+            noise_pred = model(x_noisy.to(device), t)
 
             # # Prints for debugging!
             # print(f'batch shape: {batch.shape}')
@@ -85,19 +90,19 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, learning_
             # print(f'noise shape: {noise.shape}')
 
             # Saves example spectrogram to temp/ folder
-            if not os.path.isdir(os.path.join(train_dir, 'spectrograms')):
-                os.makedirs(os.path.join(train_dir, 'spectrograms'))
             if epoch == 0:
+                if not os.path.isdir(os.path.join(train_dir, 'spectrograms')):
+                    os.makedirs(os.path.join(train_dir, 'spectrograms'))
                 for idx, item in enumerate(batch):
                     torchvision.utils.save_image(item, os.path.join(train_dir, 'spectrograms', f'spec_step{step}_{idx}.jpg') )
                     
 
-            loss = loss_func.get_loss(noise, noise_pred)
+            loss = loss_func.get_loss(noise.to(device), noise_pred)
             loss.backward()
             optimizer.step()
 
             # if epoch % 20 == 0 and step == 0: 
-            if epoch % 20 == 0 and step == 0 and epoch != 0:
+            if epoch % epochs_per_checkpoint == 0 and step == 0 and epoch != 0:
                 print('Saving wav and images...')
                 noise_schedule.save_wav(model, train_dir, epoch, spectrogram_shape, device)
 
@@ -111,9 +116,9 @@ def train_model(train_dir, data, model, loss_type, epochs, batch_size, learning_
 def main():
     # Set Training Hyperparameters
     LOSS_TYPE = 'l1'
-    NUM_EPOCHS = 100
+    NUM_EPOCHS = 1000
     BATCH_SIZE = 1
-    LEARNING_RATE = 1e-3
+    LEARNING_RATE = 1e-4
 
     # Set training parameters
     DATA_DIR = '../data' if os.path.isdir('../data') else 'data'
