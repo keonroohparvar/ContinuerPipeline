@@ -15,8 +15,8 @@ sys.path.append(parent_path)
 print(parent_path)
 
 # Local imports
-from data_pipeline.SpectrogramConverter import SpectrogramConverter
-from data_pipeline.SpectrogramParams import SpectrogramParams
+from data.util.SpectrogramConverter import SpectrogramConverter
+from data.util.SpectrogramParams import SpectrogramParams
 
 params = {
     
@@ -24,20 +24,21 @@ params = {
     'sr': 44100
 }
 
-path_to_wav = '../data/Breezin.wav'
+path_to_wav = '/home/keonroohparvar/2022-2023/winter/csc597/JazzBot/data/jazz_waveforms/jazz.00000.wav'
 
 # waveform, sr = torchaudio.load(
 #     path_to_wav,
 #     num_frames = params['sr'] * 10)
 waveform = pydub.AudioSegment.from_file(path_to_wav, format='wav', duration=20)
 
-params = SpectrogramParams()
+params = SpectrogramParams(sample_rate=22050)
 sc = SpectrogramConverter(params=params)
 
 spec = sc.spectrogram_from_audio(waveform)
 
 print(spec)
 print(type(spec))
+print(spec.dtype)
 print(spec.shape)
 
 audio_reconstructed = sc.audio_from_spectrogram(spec)

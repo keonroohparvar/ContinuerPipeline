@@ -1,41 +1,48 @@
-from typing import Optional, Tuple, Union, List
+# Adapted from https://github.com/teticio/audio-diffusion/blob/main/audiodiffusion/pipeline_audio_diffusion.py
+
+from typing import Optional, Tuple, Union
 import os
 
+from PIL import Image
+import PIL
 import numpy as np
 import torch
 
-from diffusers import StableDiffusionPipeline
-from diffusers.models import AutoencoderKL, UNet2DConditionModel
-from diffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
-from PIL import Image
-import PIL
-from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from diffusers import (
+    DiffusionPipeline,
+    LDMPipeline,
+    AudioPipelineOutput,
+    ImagePipelineOutput
+)
+from diffusers.utils import BaseOutput
+from diffusers.models import AutoencoderKL, UNet2DModel
+from diffusers.schedulers import (DDIMScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler
+)
+from audiodiffusion.mel import Mel
+
 
 # Local imports
 from data.util.SpectrogramConverter import SpectrogramConverter
 from data.util.SpectrogramParams import SpectrogramParams
 
-class JazzPipeline(StableDiffusionPipeline):
+class JazzPipeline(DiffusionPipeline):
     def __init__(
         self, 
-        unet: UNet2DConditionModel, 
-        text_encoder: CLIPTextModel,
-        tokenizer: CLIPTokenizer,
+        unet: UNet2DModel, 
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
-        vae: AutoencoderKL,
-        model_path: Optional[str] = None
+        vqvae: AutoencoderKL,
+        mel: Mel
     ):
         super().__init__()
         self.register_modules(
-            vae=vae,
-            text_encoder=text_encoder,
-            tokenizer=tokenizer,
+            vqvae=vqvae,
             unet=unet,
+            mel=mel,
             scheduler=scheduler
         )
 
-        self.model_path = model_path
-    
     @classmethod
     def load_checkpoint(
         cls,
@@ -53,168 +60,25 @@ class JazzPipeline(StableDiffusionPipeline):
 
         return model
 
-
-    def _encode_prompt(
-        self,
-        prompt,
-        device,
-        num_images_per_prompt,
-        do_classifier_free_guidance,
-        negative_prompt=None,
-        prompt_embeds: Optional[torch.FloatTensor] = None,
-        negative_prompt_embeds: Optional[torch.FloatTensor] = None,
-    ):
-        r"""
-        Encodes the prompt into text encoder hidden states.
-
-        Args:
-             prompt (`str` or `List[str]`, *optional*):
-                prompt to be encoded
-            device: (`torch.device`):
-                torch device
-            num_images_per_prompt (`int`):
-                number of images that should be generated per prompt
-            do_classifier_free_guidance (`bool`):
-                whether to use classifier free guidance or not
-            negative_prompt (`str` or `List[str]`, *optional*):
-                The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
-            prompt_embeds (`torch.FloatTensor`, *optional*):
-                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
-                provided, text embeddings will be generated from `prompt` input argument.
-            negative_prompt_embeds (`torch.FloatTensor`, *optional*):
-                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
-                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
-                argument.
-        """
-        if prompt is not None and isinstance(prompt, str):
-            batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            batch_size = prompt_embeds.shape[0]
-
-        if prompt_embeds is None:
-            text_inputs = self.tokenizer(
-                prompt,
-                padding="max_length",
-                max_length=self.tokenizer.model_max_length,
-                truncation=True,
-                return_tensors="pt",
-            )
-            text_input_ids = text_inputs.input_ids
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pt").input_ids
-
-            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(
-                text_input_ids, untruncated_ids
-            ):
-                removed_text = self.tokenizer.batch_decode(
-                    untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
-                )
-
-            if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
-                attention_mask = text_inputs.attention_mask.to(device)
-            else:
-                attention_mask = None
-
-            prompt_embeds = self.text_encoder(
-                text_input_ids.to(device),
-                attention_mask=attention_mask,
-            )
-            prompt_embeds = prompt_embeds[0]
-
-        prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
-
-        bs_embed, seq_len, _ = prompt_embeds.shape
-        # duplicate text embeddings for each generation per prompt, using mps friendly method
-        prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
-        prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
-
-        # get unconditional embeddings for classifier free guidance
-        if do_classifier_free_guidance and negative_prompt_embeds is None:
-            uncond_tokens: List[str]
-            if negative_prompt is None:
-                uncond_tokens = [""] * batch_size
-            elif type(prompt) is not type(negative_prompt):
-                raise TypeError(
-                    f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}."
-                )
-            elif isinstance(negative_prompt, str):
-                uncond_tokens = [negative_prompt]
-            elif batch_size != len(negative_prompt):
-                raise ValueError(
-                    f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
-                    f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`."
-                )
-            else:
-                uncond_tokens = negative_prompt
-
-            max_length = prompt_embeds.shape[1]
-            uncond_input = self.tokenizer(
-                uncond_tokens,
-                padding="max_length",
-                max_length=max_length,
-                truncation=True,
-                return_tensors="pt",
-            )
-
-            if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
-                attention_mask = uncond_input.attention_mask.to(device)
-            else:
-                attention_mask = None
-
-            negative_prompt_embeds = self.text_encoder(
-                uncond_input.input_ids.to(device),
-                attention_mask=attention_mask,
-            )
-            negative_prompt_embeds = negative_prompt_embeds[0]
-
-        if do_classifier_free_guidance:
-            # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
-            seq_len = negative_prompt_embeds.shape[1]
-
-            negative_prompt_embeds = negative_prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
-
-            negative_prompt_embeds = negative_prompt_embeds.repeat(1, num_images_per_prompt, 1)
-            negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
-
-            # For classifier free guidance, we need to do two forward passes.
-            # Here we concatenate the unconditional and text embeddings into a single batch
-            # to avoid doing two forward passes
-            prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
-
-        return prompt_embeds
-
-    
     @torch.no_grad()
     def generate_init_image(
         self,
         model_path: Optional[str] = None
     ):
+    # TODO(keon): Generate initial image
         if model_path is None:
             if self.model_path is None:
                 raise NotImplementedError()
             model_path = self.model_path
         
-        sd_pipe = StableDiffusionPipeline.from_pretrained(model_path, torch_dtype=torch.float16)
+        sd_pipe = JazzPipeline.from_pretrained(model_path, torch_dtype=torch.float16)
         sd_pipe.to('cuda')
 
-        image = sd_pipe(prompt="jazz").images[0]
+        image = sd_pipe().images[0]
         self.init_image_location = 'jazz_init_image.png'
         image.save(self.init_image_location)
 
         return self.init_image_location
-    
-    @property
-    def device(self) -> str:
-        return str(self.vae.device)
-    
-    # @property 
-    # def img_size(self) -> tuple(int, int):
-    #     return (512, 512)
     
     @classmethod
     def convert_image_to_wav(
@@ -258,7 +122,9 @@ class JazzPipeline(StableDiffusionPipeline):
         init_image: Optional[str] = None,
         batch_size: int = 1,
         generator: Optional[torch.Generator] = None,
+        step_generator: Optional[torch.Generator] = None,
         num_inference_steps: int = 50,
+        eta: float = 0,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         **kwargs,
@@ -285,79 +151,90 @@ class JazzPipeline(StableDiffusionPipeline):
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
             generated images.
         """
-        height = height or self.unet.config.sample_size * self.vae_scale_factor
-        width = width or self.unet.config.sample_size * self.vae_scale_factor
-
-        if init_image is None:
-            init_image = self.generate_init_image()
+        # if init_image is None:
+        #     init_image = self.generate_init_image()
         
-        elif not os.path.exists(init_image):
-            raise FileNotFoundError(f'The initial file {init_image} is not found.')
+        # elif not os.path.exists(init_image):
+        #     raise FileNotFoundError(f'The initial file {init_image} is not found.')
 
-        
-        prompt_embeds = self._encode_prompt(
-            'jazz',
-            self.vae.device,
-            1,
-            False,
-            None,
-            prompt_embeds=None,
-            negative_prompt_embeds=None,
+        # Get initial random latents
+        latents = torch.randn(
+            (
+                batch_size,
+                self.unet.in_channels,
+                self.unet.sample_size[0],
+                self.unet.sample_size[1],
+            ),
+            generator=generator,
+            device=self.device,
         )
 
-        init_image_latents = self.vae.encode(np.array([Image.open(init_image)])).latent_dist.sample()
-        latents = init_image_latents * self.vae.config.scaling_factor
 
-        # num_channels_latents = self.unet.in_channels
-        # latents = self.prepare_latents(
-        #     batch_size * num_images_per_prompt,
-        #     num_channels_latents,
-        #     height,
-        #     width,
-        #     prompt_embeds.dtype,
-        #     device,
-        #     generator,
-        #     init_image_latents,
-        # )
-
-        self.scheduler.set_timesteps(num_inference_steps, device=self.vae.device)
+        # Set scheduler timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
 
+        # For backwards compatability
+        if type(self.unet.sample_size) == int:
+            self.unet.sample_size = (self.unet.sample_size, self.unet.sample_size)
 
-        with self.progress_bar(total=num_inference_steps) as progress_bar:
-            for i, t in enumerate(timesteps):
-                latent_model_input = self.scheduler.scale_model_input(init_image_latents, t)
 
-                noise_pred = self.unet(
-                    latent_model_input,
-                    t,
-                    encoder_hidden_states=prompt_embeds,
-                    cross_attention_kwargs=None,
-                ).sample
+        for step, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
+            model_output = self.unet(latents, t)["sample"]
 
-                latents = self.scheduler.step(noise_pred, t, latents).prev_sample
-
+            if isinstance(self.scheduler, DDIMScheduler):
+                latents = self.scheduler.step(
+                    model_output=model_output,
+                    timestep=t,
+                    sample=latents,
+                    eta=eta,
+                    generator=step_generator,
+                )["prev_sample"]
+            else:
+                latents = self.scheduler.step(
+                    model_output=model_output,
+                    timestep=t,
+                    sample=latents,
+                    generator=step_generator,
+                )["prev_sample"]
+            
+        if self.vqvae is not None:
+            # 0.18215 was scaling factor used in training to ensure unit variance
+            latents = 1 / 0.18215 * latents
+            images = self.vqvae.decode(latents)["sample"]
         
-        if output_type == "latent":
-            image = latents
-            has_nsfw_concept = None
-        elif output_type == "pil":
-            # 8. Post-processing
-            image = self.decode_latents(latents)
-            image = self.numpy_to_pil(image)
-        else:
-            # 8. Post-processing
-            image = self.decode_latents(latents)
+        # Format images
+        images = (images / 2 + 0.5).clamp(0, 1)
+        images = images.cpu().permute(0, 2, 3, 1).numpy()
+        images = (images * 255).round().astype("uint8")
+        images = list(
+            map(lambda _: Image.fromarray(_[:, :, 0]), images)
+            if images.shape[3] == 1
+            else map(lambda _: Image.fromarray(_, mode="RGB").convert("L"), images)
+        )
+
+        audios = list(map(lambda _: self.mel.image_to_audio(_), images))
 
         if not return_dict:
-            return (image, has_nsfw_concept)
+            return images, (self.mel.get_sample_rate(), audios)
 
-        return image
+        return BaseOutput(**AudioPipelineOutput(np.array(audios)[:, np.newaxis, :]), **ImagePipelineOutput(images))
 
 
 if __name__ == '__main__':
-    img = '/home/keonroohparvar/2022-2023/winter/csc597/JazzBot/jazz_img.png'
+    model_path = '../keons_model'
 
-    JazzPipeline.convert_image_to_wav(img, 'jazz.wav')
+    unet = UNet2DModel.from_pretrained(model_path, subfolder='unet')
+    vqvae = AutoencoderKL.from_pretrained(model_path, subfolder='vqvae')
+    scheduler = DDIMScheduler.from_pretrained(model_path, subfolder='scheduler')
+    mel = Mel.from_pretrained(model_path, subfolder='mel')
+
+    pipe = JazzPipeline(
+        unet,
+        vqvae,
+        scheduler,
+        mel
+    )
+
 
 
