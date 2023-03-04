@@ -7,19 +7,16 @@ from PIL import Image
 import PIL
 import numpy as np
 import torch
+import soundfile as sf
 
 from diffusers import (
     DiffusionPipeline,
-    LDMPipeline,
     AudioPipelineOutput,
     ImagePipelineOutput
 )
 from diffusers.utils import BaseOutput
 from diffusers.models import AutoencoderKL, UNet2DModel
-from diffusers.schedulers import (DDIMScheduler,
-    LMSDiscreteScheduler,
-    PNDMScheduler
-)
+from diffusers.schedulers import DDPMScheduler, DDIMScheduler
 from audiodiffusion.mel import Mel
 
 
@@ -31,7 +28,7 @@ class JazzPipeline(DiffusionPipeline):
     def __init__(
         self, 
         unet: UNet2DModel, 
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: Union[DDPMScheduler, DDIMScheduler],
         vqvae: AutoencoderKL,
         mel: Mel
     ):
@@ -42,6 +39,20 @@ class JazzPipeline(DiffusionPipeline):
             mel=mel,
             scheduler=scheduler
         )
+
+    def get_input_dims(self) -> Tuple:
+        """Returns dimension of input image
+        Returns:
+            `Tuple`: (height, width)
+        """
+        input_module = self.vqvae if self.vqvae is not None else self.unet
+        # For backwards compatibility
+        sample_size = (
+            (input_module.sample_size, input_module.sample_size)
+            if type(input_module.sample_size) == int
+            else input_module.sample_size
+        )
+        return sample_size
 
     @classmethod
     def load_checkpoint(
@@ -115,11 +126,21 @@ class JazzPipeline(DiffusionPipeline):
             wav_segment.export(out_f=out_location, format='wav')
 
         return wav_segment
+    
+    @torch.no_grad()
+    def export_audio(
+        self,
+        audio: np.ndarray,
+        out_path: str
+    ):
+        """
+        This will take raw audio and export it to the location defined by str
+        """
+        sf.write(out_path, audio, self.mel.get_sample_rate(), 'PCM_24')
 
     @torch.no_grad()
     def __call__(
         self,
-        init_image: Optional[str] = None,
         batch_size: int = 1,
         generator: Optional[torch.Generator] = None,
         step_generator: Optional[torch.Generator] = None,
@@ -156,6 +177,13 @@ class JazzPipeline(DiffusionPipeline):
         
         # elif not os.path.exists(init_image):
         #     raise FileNotFoundError(f'The initial file {init_image} is not found.')
+
+        if generator == None:
+            generator = torch.Generator(
+                device=self.unet.device
+            )
+        
+        step_generator = step_generator or generator
 
         # Get initial random latents
         latents = torch.randn(
@@ -203,6 +231,11 @@ class JazzPipeline(DiffusionPipeline):
             latents = 1 / 0.18215 * latents
             images = self.vqvae.decode(latents)["sample"]
         
+        # print('max:')
+        # print(torch.max(images))
+        # print('min')
+        # print(torch.min(images))
+        
         # Format images
         images = (images / 2 + 0.5).clamp(0, 1)
         images = images.cpu().permute(0, 2, 3, 1).numpy()
@@ -226,15 +259,34 @@ if __name__ == '__main__':
 
     unet = UNet2DModel.from_pretrained(model_path, subfolder='unet')
     vqvae = AutoencoderKL.from_pretrained(model_path, subfolder='vqvae')
-    scheduler = DDIMScheduler.from_pretrained(model_path, subfolder='scheduler')
+    scheduler = DDPMScheduler.from_pretrained(model_path, subfolder='scheduler')
     mel = Mel.from_pretrained(model_path, subfolder='mel')
 
     pipe = JazzPipeline(
-        unet,
-        vqvae,
-        scheduler,
-        mel
+        unet = unet,
+        scheduler = scheduler,
+        vqvae = vqvae,
+        mel = mel
     )
+
+    # output = pipe(batch_size=1, return_dict=True, num_inference_steps=1000)
+    output = pipe(batch_size=1, return_dict=True)
+    print(output)
+
+    # for img in output["images"]:
+    #     print(type(img))
+    #     img.show(img)
+    #     img.save('yeet.jpg')
+    
+    for wav_list in output['audios']:
+        wav = wav_list[0]
+        print(wav)
+        print(wav.shape)
+        print(wav.dtype)
+        print(np.min(wav))
+        print(np.max(wav))
+        # exit()
+        pipe.export_audio(wav, './test.wav')
 
 
 
