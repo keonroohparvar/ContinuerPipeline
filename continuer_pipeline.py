@@ -17,6 +17,7 @@ from diffusers import (
 from diffusers.utils import BaseOutput
 from diffusers.models import AutoencoderKL, UNet2DModel
 from diffusers.schedulers import DDPMScheduler, DDIMScheduler
+from diffusers.utils.torch_utils import randn_tensor
 from audiodiffusion.mel import Mel
 
 
@@ -95,7 +96,7 @@ class ContinuerPipeline(DiffusionPipeline):
         out_path: Optional[str] = None
     ) -> Image.Image :
         if diffusion_pipeline_name is None:
-            DEFAULT_AUDIO_DIFFUSION_GENERATOR = 'teticio/audio-diffusion-256'
+            DEFAULT_AUDIO_DIFFUSION_GENERATOR = 'teticio/latent-audio-diffusion-256'
             pipe = DiffusionPipeline.from_pretrained(DEFAULT_AUDIO_DIFFUSION_GENERATOR).to(self.device)
             print('using default pipe!')
         else:
@@ -106,6 +107,10 @@ class ContinuerPipeline(DiffusionPipeline):
         generator.manual_seed(seed)
 
         pipe_output = pipe(generator=generator)
+        # pipe_output = pipe(
+        #      steps=50,
+        #     generator=generator
+        # )
         img_output = pipe_output.images[0]
 
         # pipe_output = pipe(
@@ -140,6 +145,9 @@ class ContinuerPipeline(DiffusionPipeline):
     @torch.no_grad()
     def __call__(
         self,
+        audio_path: Optional[str] = None,
+        raw_audio: Optional[np.ndarray] = None,
+        slice: Optional[int] = 0,
         root_img: Optional[Image.Image] = None,
         prev_img: Optional[Image.Image] = None,
         num_imgs_generated: Optional[int] = 1,
@@ -184,34 +192,52 @@ class ContinuerPipeline(DiffusionPipeline):
         if type(self.unet.sample_size) == int:
             self.unet.sample_size = (self.unet.sample_size, self.unet.sample_size)
 
+        # Initialize generators
         if generator == None:
             generator = torch.Generator(
                 device=self.unet.device
             )
-        
         step_generator = step_generator or generator
 
-        # Configure root_img and prev_img
-        if root_img is None:
-            root_img = self.generate_init_image(out_path='root_img.jpg', generator=generator)
-            
-        root_latents = self._encode_img(root_img, generator)
+        first_img = None
+
+        # Get root image from either raw audio or input image
+        if audio_path is not None or raw_audio is not None:
+            self.mel.load_audio(audio_path, raw_audio)
+            first_img = self.mel.audio_slice_to_image(slice)
+
+        # If audio_paht or raw_audio is not passed, we assume images are passed in
+        else:
+            if root_img is None:
+                first_img = self.generate_init_image(out_path='root_img.jpg', generator=generator)
         
+        if first_img is None:
+            first_img = root_img
+                
+        assert first_img is not None
+        root_latents = self._encode_img(first_img, generator)
+            
         if prev_img is None:
-            prev_img = root_img
+            prev_img = first_img
             prev_latents = root_latents 
         else:
             prev_latents = self._encode_img(prev_img, generator)
-        
+            
         # Initialize the generator to a printed seed
-        seed = generator.seed()
-        print(f'Training Seed: {seed}')
-        generator.manual_seed(seed)
+        step_seed = step_generator.seed()
+        print(f'Training Seed: {step_seed}')
+        step_generator.manual_seed(step_seed)
+
+        # Set scheduler timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.scheduler.timesteps
+
+        # Create array for output images
+        output_imgs = []
 
         # Loop over the number of images we are going to generate
-        output_imgs = []
         for _ in range(num_imgs_generated):
-            latents = torch.randn(
+            latents = randn_tensor(
                 (
                     1,
                     1,
@@ -221,10 +247,6 @@ class ContinuerPipeline(DiffusionPipeline):
                 generator=generator,
                 device=self.device,
             )
-
-            # Set scheduler timesteps
-            self.scheduler.set_timesteps(num_inference_steps)
-            timesteps = self.scheduler.timesteps
 
             # Do backwards diffusion
             for step, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
@@ -322,10 +344,17 @@ if __name__ == '__main__':
         mel = mel
     )
 
+    # pipe(
+    #     # root_img=Image.open('root_img.jpg'),
+    #     num_imgs_generated=5,
+    #     out_dir='keon_results'
+    # )
+
+    wav_file = 'data/Breezin.wav'
     pipe(
-        # root_img=Image.open('root_img.jpg'),
-        num_imgs_generated=5,
-        out_dir='keon_results'
+        audio_path = wav_file,
+        num_imgs_generated = 5,
+        out_dir = 'keon_breezin'
     )
 
     # # output = pipe(batch_size=1, return_dict=True, num_inference_steps=1000)
