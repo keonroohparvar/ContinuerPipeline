@@ -7,6 +7,7 @@ from PIL import Image
 import PIL
 import numpy as np
 import torch
+from torchvision.transforms import Compose, Normalize, ToTensor
 import soundfile as sf
 
 from diffusers import (
@@ -58,15 +59,17 @@ class ContinuerPipeline(DiffusionPipeline):
         return sample_size
     
     def _encode_img(self, img: Image.Image, generator: torch.Generator):
-        input_image = np.frombuffer(img.tobytes(), dtype="uint8").reshape(
-            (img.height, img.width)
-        )
-        input_image = (input_image / 255) * 2 - 1
-        imgs = torch.tensor(input_image[np.newaxis, :, :], dtype=torch.float).to(self.device)
+        augmentations = Compose([
+            ToTensor(),
+            Normalize([0.5], [0.5]),
+        ])
+
+        imgs = augmentations(img)
+        
         imgs = self.vqvae.encode(torch.unsqueeze(imgs, 0)).latent_dist.sample(
             generator=generator
         )[0]
-        imgs = self.vqvae.config.scaling_factor * imgs
+        imgs = imgs * 0.18215
         
         return imgs[np.newaxis, :, :]
 
@@ -92,10 +95,11 @@ class ContinuerPipeline(DiffusionPipeline):
         self,
         diffusion_pipeline_name: Optional[str] = None,
         generator: Optional[torch.Generator] = None,
-        out_path: Optional[str] = None
+        out_dir: Optional[str] = None,
+        name: Optional[str] = None
     ) -> Image.Image :
         if diffusion_pipeline_name is None:
-            DEFAULT_AUDIO_DIFFUSION_GENERATOR = 'teticio/audio-diffusion-256'
+            DEFAULT_AUDIO_DIFFUSION_GENERATOR = 'teticio/latent-audio-diffusion-256'
             pipe = DiffusionPipeline.from_pretrained(DEFAULT_AUDIO_DIFFUSION_GENERATOR).to(self.device)
             print('using default pipe!')
         else:
@@ -121,8 +125,8 @@ class ContinuerPipeline(DiffusionPipeline):
         print(np.max(img_numpy))
         print(np.min(img_numpy))
 
-        if out_path is not None:
-            img_output.save(out_path)
+        if out_dir is not None:
+            img_output.save(os.path.join(out_dir, name))
 
         return img_output
     
@@ -193,7 +197,7 @@ class ContinuerPipeline(DiffusionPipeline):
 
         # Configure root_img and prev_img
         if root_img is None:
-            root_img = self.generate_init_image(out_path='root_img.jpg', generator=generator)
+            root_img = self.generate_init_image(name='root_img.jpg', out_dir=out_dir, generator=generator)
             
         root_latents = self._encode_img(root_img, generator)
         
@@ -256,7 +260,7 @@ class ContinuerPipeline(DiffusionPipeline):
                     )["prev_sample"]
                 
 
-            prev_latents = latents
+            prev_latents = latents.detach().clone()
             if self.vqvae is not None:
                 # 0.18215 was scaling factor used in training to ensure unit variance
                 latents = 1 / 0.18215 * latents
