@@ -213,7 +213,15 @@ class ContinuerPipeline(DiffusionPipeline):
         # If audio_paht or raw_audio is not passed, we assume images are passed in
         else:
             if root_img is None:
-                first_img = self.generate_init_image(out_path='root_img.jpg', generator=generator)
+                # Create output directory if it does not exist
+                if not os.path.isdir(out_dir):
+                    os.makedirs(out_dir)
+
+                first_img = self.generate_init_image(
+                                    name='root_img.jpg', 
+                                    out_dir=out_dir, 
+                                    generator=generator
+                                )
         
         if first_img is None:
             first_img = root_img
@@ -307,21 +315,20 @@ class ContinuerPipeline(DiffusionPipeline):
         audios = list(map(lambda _: self.mel.image_to_audio(_), out_pil_images))
 
         # Save results if out_dir is specified
-        if out_dir is not None:
-            if not os.path.isdir(out_dir):
-                os.makedirs(out_dir)
-            
-            # Export images
-            for i, img in enumerate(out_pil_images):
-                img.save(os.path.join(out_dir, f'img{i}.jpg'))
-            
-            # Export individual wavs
-            for i, wav in enumerate(audios):
-                self.export_audio(wav, os.path.join(out_dir, f'slice{i}.wav'))
-            
-            # Export audio in its entirety
-            audio_concatenated = np.concatenate(np.array(audios))
-            self.export_audio(audio_concatenated, os.path.join(out_dir,'entire_song.wav'))
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir)
+        
+        # Export images
+        for i, img in enumerate(out_pil_images):
+            img.save(os.path.join(out_dir, f'img{i}.jpg'))
+        
+        # Export individual wavs
+        for i, wav in enumerate(audios):
+            self.export_audio(wav, os.path.join(out_dir, f'slice{i}.wav'))
+        
+        # Export audio in its entirety
+        audio_concatenated = np.concatenate(np.array(audios))
+        self.export_audio(audio_concatenated, os.path.join(out_dir,'entire_song.wav'))
 
         if not return_dict:
             return images, (self.mel.get_sample_rate(), audios)
@@ -330,7 +337,7 @@ class ContinuerPipeline(DiffusionPipeline):
 
 
 if __name__ == '__main__':
-    model_path = './keons_continuer'
+    model_path = '../keons_continuer'
 
     unet = UNet2DModel.from_pretrained(model_path, subfolder='unet')
     vqvae = AutoencoderKL.from_pretrained(model_path, subfolder='vqvae')
@@ -357,7 +364,7 @@ if __name__ == '__main__':
     wav_file = 'data/Breezin.wav'
     pipe(
         audio_path = wav_file,
-        num_imgs_generated = 5,
+        num_imgs_generated = 10,
         out_dir = 'keon_breezin'
     )
 
