@@ -22,10 +22,6 @@ from diffusers.utils.torch_utils import randn_tensor
 from audiodiffusion.mel import Mel
 
 
-# # Local imports
-# from data.util.SpectrogramConverter import SpectrogramConverter
-# from data.util.SpectrogramParams import SpectrogramParams
-
 class ContinuerPipeline(DiffusionPipeline):
     def __init__(
         self, 
@@ -66,13 +62,14 @@ class ContinuerPipeline(DiffusionPipeline):
         ])
 
         imgs = augmentations(img)
+
+        if len(imgs.shape) == 3:
+            imgs = imgs.reshape(-1, *imgs.shape)
         
-        imgs = self.vqvae.encode(torch.unsqueeze(imgs, 0)).latent_dist.sample(
-            generator=generator
-        )[0]
+        imgs = self.vqvae.encode(imgs).latent_dist.sample()
         imgs = imgs * 0.18215
         
-        return imgs[np.newaxis, :, :]
+        return imgs
 
     @classmethod
     def load_checkpoint(
@@ -146,18 +143,23 @@ class ContinuerPipeline(DiffusionPipeline):
         """
         sf.write(out_path, audio, self.mel.get_sample_rate(), 'PCM_24')
 
+    def get_default_steps(self) -> int:
+        """Returns default number of steps recommended for inference
+
+        Returns:
+            `int`: number of steps
+        """
+        return 50 if isinstance(self.scheduler, DDIMScheduler) else 1000
+
     @torch.no_grad()
     def __call__(
         self,
         audio_path: Optional[str] = None,
         raw_audio: Optional[np.ndarray] = None,
-        slice: Optional[int] = 0,
-        root_img: Optional[Image.Image] = None,
-        prev_img: Optional[Image.Image] = None,
         num_imgs_generated: Optional[int] = 1,
         generator: Optional[torch.Generator] = None,
         step_generator: Optional[torch.Generator] = None,
-        num_inference_steps: int = 50,
+        steps: Optional[int] = None,
         eta: float = 0,
         return_dict: bool = True,
         out_dir: Optional[str] = None,
@@ -186,11 +188,8 @@ class ContinuerPipeline(DiffusionPipeline):
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
             generated images.
         """
-        # if init_image is None:
-        #     init_image = self.generate_init_image()
-        
-        # elif not os.path.exists(init_image):
-        #     raise FileNotFoundError(f'The initial file {init_image} is not found.')
+        steps = steps or self.get_default_steps()
+        self.scheduler.set_timesteps(steps)
 
         # For backwards compatability
         if type(self.unet.sample_size) == int:
@@ -201,6 +200,13 @@ class ContinuerPipeline(DiffusionPipeline):
             generator = torch.Generator(
                 device=self.unet.device
             )
+
+        # Initialize the generator to a printed seed
+        gen_seed = generator.seed()
+        print(f'Training Seed: {gen_seed}')
+        generator.manual_seed(gen_seed)
+
+        # Initialize step generator if not passed in
         step_generator = step_generator or generator
 
         first_img = None
@@ -208,48 +214,48 @@ class ContinuerPipeline(DiffusionPipeline):
         # Get root image from either raw audio or input image
         if audio_path is not None or raw_audio is not None:
             self.mel.load_audio(audio_path, raw_audio)
-            first_img = self.mel.audio_slice_to_image(slice)
-
-        # If audio_paht or raw_audio is not passed, we assume images are passed in
-        else:
-            if root_img is None:
-                # Create output directory if it does not exist
-                if not os.path.isdir(out_dir):
-                    os.makedirs(out_dir)
-
-                first_img = self.generate_init_image(
-                                    name='root_img.jpg', 
-                                    out_dir=out_dir, 
-                                    generator=generator
-                                )
+            root_audio = self.mel.audio
+            number_of_slices = self.mel.get_number_of_slices()
+            print(f'Number of slices in audio: {number_of_slices}')
+            first_img = self.mel.audio_slice_to_image(slice=0)
+            prev_img = self.mel.audio_slice_to_image(slice=(number_of_slices-1))
         
-        if first_img is None:
-            first_img = root_img
-                
-        assert first_img is not None
-        root_latents = self._encode_img(first_img, generator)
-            
-        if prev_img is None:
-            prev_img = first_img
-            prev_latents = root_latents 
         else:
-            prev_latents = self._encode_img(prev_img, generator)
+            print(f'Error. Did not provide audio_path or raw_audio arguments.')
+            exit()
+
+        
+        # Get x0 and xt latents, and noise latents
+        root_latents = self._encode_img(first_img, generator)
+        prev_latents = self._encode_img(prev_img, generator)
+        target_latents = self._encode_img(
+                randn_tensor(
+                    first_img.size, 
+                    generator=generator,
+                    device=self.device
+                    ).numpy(),
+                generator=generator
+        )
+
+        print(f'Min | Max of Root: {torch.min(root_latents)} {torch.max(root_latents)}')
+        print(f'Min | Max of prev: {torch.min(prev_latents)} {torch.max(prev_latents)}')
+        print(f'Min | Max of prev: {torch.min(target_latents)} {torch.max(target_latents)}')
+        print(f'Averages of root, prev, latents: {torch.mean(root_latents)} | {torch.mean(prev_latents)} | {torch.mean(target_latents)}')
+        print(f'shapes of root, prev, latents: {root_latents.shape} | {prev_latents.shape} | {target_latents.shape}')
+
+
             
-        # Initialize the generator to a printed seed
+       # Initialize the generator to a printed seed
         step_seed = step_generator.seed()
         print(f'Training Seed: {step_seed}')
         step_generator.manual_seed(step_seed)
-
-        # Set scheduler timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
 
         # Create array for output images
         output_imgs = []
 
         # Loop over the number of images we are going to generate
         for _ in range(num_imgs_generated):
-            latents = randn_tensor(
+            target_latents = randn_tensor(
                 (
                     1,
                     1,
@@ -259,13 +265,18 @@ class ContinuerPipeline(DiffusionPipeline):
                 generator=generator,
                 device=self.device,
             )
+            # latents = latents * 0.18215
 
             # Do backwards diffusion
             for step, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
                 # Configure input for model
-                model_input = torch.cat([root_latents, prev_latents, latents], axis=1)
+                model_input = torch.cat([root_latents, prev_latents, target_latents], axis=1)
                 if step == 0:
                     print(f'Model input shape: {model_input.shape}')
+
+
+                if step % 100 == 0:
+                    print(f'Min|Max|Mean of target latents: {torch.min(target_latents)} | {torch.max(target_latents)} | {torch.mean(target_latents)}')
 
                 model_output = self.unet(model_input, t)["sample"]
 
@@ -274,27 +285,27 @@ class ContinuerPipeline(DiffusionPipeline):
                     print(model_output)
 
                 if isinstance(self.scheduler, DDIMScheduler):
-                    latents = self.scheduler.step(
+                    target_latents = self.scheduler.step(
                         model_output=model_output,
                         timestep=t,
-                        sample=latents,
+                        sample=target_latents,
                         eta=eta,
                         generator=step_generator,
                     )["prev_sample"]
                 else:
-                    latents = self.scheduler.step(
+                    target_latents = self.scheduler.step(
                         model_output=model_output,
                         timestep=t,
-                        sample=latents,
+                        sample=target_latents,
                         generator=step_generator,
                     )["prev_sample"]
                 
 
-            prev_latents = latents.detach().clone()
+            prev_latents = target_latents.detach().clone()
             if self.vqvae is not None:
                 # 0.18215 was scaling factor used in training to ensure unit variance
-                latents = 1 / 0.18215 * latents
-                images = self.vqvae.decode(latents)["sample"]
+                target_latents = 1 / 0.18215 * target_latents
+                images = self.vqvae.decode(target_latents)["sample"]
                 print(f'Images decoded shape: {images.shape}')
                 output_imgs.append(images[0])
             
@@ -308,27 +319,40 @@ class ContinuerPipeline(DiffusionPipeline):
             image = Image.fromarray(image[:, :, 0]) if image.shape[2] == 1 else \
                 Image.fromarray(image, mode="RGB").convert("L")
 
-            print('FINAL OUTPUTS')
-            print(image)
             out_pil_images.append(image)
 
         audios = list(map(lambda _: self.mel.image_to_audio(_), out_pil_images))
 
         # Save results if out_dir is specified
-        if not os.path.isdir(out_dir):
-            os.makedirs(out_dir)
-        
-        # Export images
-        for i, img in enumerate(out_pil_images):
-            img.save(os.path.join(out_dir, f'img{i}.jpg'))
-        
-        # Export individual wavs
-        for i, wav in enumerate(audios):
-            self.export_audio(wav, os.path.join(out_dir, f'slice{i}.wav'))
-        
-        # Export audio in its entirety
-        audio_concatenated = np.concatenate(np.array(audios))
-        self.export_audio(audio_concatenated, os.path.join(out_dir,'entire_song.wav'))
+        if out_dir is not None:
+            if not os.path.isdir(out_dir):
+                os.makedirs(out_dir)
+            
+            # Export images
+            for i, img in enumerate(out_pil_images):
+                img.save(os.path.join(out_dir, f'img{i}.jpg'))
+            
+            # Export individual wavs
+            for i, wav in enumerate(audios):
+                self.export_audio(wav, os.path.join(out_dir, f'slice{i}.wav'))
+            
+            # Export audio in its entirety
+            # audios.insert(0, root_audio)
+            audio_concatenated = np.concatenate(audios)
+            self.export_audio(audio_concatenated, os.path.join(out_dir,'entire_song.wav'))
+
+            # For debugging purposes
+            if os.getenv('DEBUG_CONTINUER', 'false').lower() in ('true', '1', 't'):
+                true_imgs_path = os.path.join(out_dir, 'true_imgs')
+                if not os.path.isdir(true_imgs_path):
+                    os.makedirs(true_imgs_path)
+                
+                first_img.save(os.path.join(out_dir, f'first_img.jpg'))
+                for i in range(num_imgs_generated):
+                    this_img = self.mel.audio_slice_to_image(i)
+                    this_img.save(os.path.join(true_imgs_path, f'true_img_{i}.jpg'))
+
+
 
         if not return_dict:
             return images, (self.mel.get_sample_rate(), audios)
@@ -344,10 +368,6 @@ if __name__ == '__main__':
     scheduler = DDPMScheduler.from_pretrained(model_path, subfolder='scheduler')
     mel = Mel.from_pretrained(model_path, subfolder='mel')
 
-    # path1 = Image.open('root_img.jpg')
-    # path2 = Image.open('out.jpg')
-    # audios = list(map(lambda _: mel.image_to_audio(_), [path1, path2]))
-
     pipe = ContinuerPipeline(
         unet = unet,
         scheduler = scheduler,
@@ -361,11 +381,11 @@ if __name__ == '__main__':
     #     out_dir='keon_results'
     # )
 
-    wav_file = 'data/Breezin.wav'
+    wav_file = 'results/train_dataset_imgs/root_wav.wav'
     pipe(
         audio_path = wav_file,
-        num_imgs_generated = 10,
-        out_dir = 'keon_breezin'
+        num_imgs_generated = 2,
+        out_dir = 'results/results_on_train_dataset'
     )
 
     # # output = pipe(batch_size=1, return_dict=True, num_inference_steps=1000)
