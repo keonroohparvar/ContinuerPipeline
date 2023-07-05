@@ -14,3 +14,5 @@ The file structure of this repo is the following:
 ```
 
 My thesis document describes how this technology works in depth, but at a high level, the Continuer Pipeline simply takes in a waveform and predicts what the next 5-second chunk will sound like. It does this using a novel Latent Diffusion model architecture, and internally converts all waveforms to spectrograms to handle this problem in the image space. 
+
+My trained models responsible for the diffusion process can be found on the Hugging Face hub [here](https://huggingface.co/keonroohparvar/continuer_pipeline); please refer to the bottom of the `continuer_pipeline.py` file to see an example usage of how to use the pipeline.
