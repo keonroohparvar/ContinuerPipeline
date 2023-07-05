@@ -13,4 +13,4 @@ The file structure of this repo is the following:
 └── continuer_pipeline.py  # The main file that contains the pipeline implementation
 ```
 
-My Thesis document describes how this tehcnology works in depth, but at a high level, the Continuer Pipeline simply takes in a waveform and predicts what the next 5-second chunk will sound like. It does this using a novel Latent Diffusion model architecture, and ultimately converts all the waveforms to spectrograms to handle this problem in the image space. 
+My thesis document describes how this technology works in depth, but at a high level, the Continuer Pipeline simply takes in a waveform and predicts what the next 5-second chunk will sound like. It does this using a novel Latent Diffusion model architecture, and internally converts all waveforms to spectrograms to handle this problem in the image space. 
