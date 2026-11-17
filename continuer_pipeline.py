@@ -18,7 +18,7 @@ from diffusers.utils import BaseOutput
 from diffusers.models import AutoencoderKL, UNet2DModel
 from diffusers.schedulers import DDPMScheduler, DDIMScheduler
 from diffusers.utils.torch_utils import randn_tensor
-from audiodiffusion.mel import Mel
+from diffusers.pipelines.deprecated.audio_diffusion import Mel
 
 
 class ContinuerPipeline(DiffusionPipeline):

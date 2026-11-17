@@ -1,6 +1,30 @@
 # ContinuerPipeline
 This repo contains most of the work done for my Master's Thesis. The Continuer Pipeline is a pipeline that utilizes a novel Latent Diffusion model architecture to take a piece of music and extend it by 5 seconds. 
 
+## Inference environment
+
+Use Python 3.12 or newer in a fresh virtual environment:
+
+```sh
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements_for_env.txt
+python -m pip check
+```
+
+The requirements cover `continuer_pipeline.py`. The scripts under `legacy/`
+are archived experiments, not supported by this inference environment. The old
+training dependencies (`datasets`, `transformers`, `accelerate`, and
+`audiodiffusion`) are no longer installed. The pipeline now uses the Mel
+converter included in Diffusers, so it does not need `aiohttp`.
+`certifi` remains a required dependency of the HTTP clients used by Diffusers
+and Hugging Face; its minimum version excludes the compromised CA bundle.
+
+Create a fresh environment rather than installing over the old frozen environment;
+otherwise unused vulnerable packages can remain installed. To audit the resolved
+environment, install and run `pip-audit` in that environment.
+
 ## Thesis Document
 My thesis describes how this technology works in depth, but at a high level, the Continuer Pipeline simply takes in a waveform and predicts what the next 5-second chunk will sound like. It does this using a novel Latent Diffusion model architecture, and internally converts all waveforms to spectrograms to handle this problem in the image space. 
 
